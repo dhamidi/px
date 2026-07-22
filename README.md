@@ -60,6 +60,25 @@ cd .. && swipl apps/adr_site.pl 8090
 Or as a systemd user service — see `deploy/prologex.service` for the
 install commands.
 
+## px_ui — the component library
+
+A full port of [Radix UI's primitives](https://www.radix-ui.com/) to
+server-rendered Prolog templates: 32 components living in `prolog/ui/`,
+browsable live at `/ui` on the demo site. The porting recipe is
+`adr/0026`; the per-component analysis that drove it is
+`docs/radix-port-analysis.md`. Highlights of the approach: the exact
+Radix data-state/ARIA styling contract, platform-first implementations
+(native `<dialog>`, the `popover` attribute, `<details name=...>`
+exclusivity, styled native inputs) with small custom elements only for
+irreducible behavior (roving tabindex, typeahead, hover delays), shared
+machinery as plain ES modules (`lib/roving-focus`, `lib/popper`,
+`lib/menu`) served through the import map, and progressive enhancement
+throughout — Select renders a real native `<select>` that both works
+without JS and remains the form-submitted value store after upgrade.
+Every component shipped with contract tests, a CSS-coverage guard, and
+headless-Chrome verification of real interactions against
+radix-ui.com's own demos.
+
 ## Tests
 
 Each `test/milestoneN_*.pl` is a standalone proof that one layer of the
