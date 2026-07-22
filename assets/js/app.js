@@ -18,3 +18,9 @@ import "components/switch";
 // indeterminate case -- sets the JS-only .indeterminate property and
 // keeps aria-checked/data-state live once a click resolves it away.
 import "components/checkbox";
+// <px-toggle-group> is ui/toggle_group.pl's (adr/0026): the library's
+// first roving-focus consumer (assets/js/lib/roving-focus.js) --
+// arrow-key/Home/End navigation across Items, plus instant click-flip
+// of aria-pressed/aria-checked/data-state (type=single also enforces
+// radio-like exclusivity across siblings).
+import "components/toggle_group";

@@ -880,3 +880,116 @@ px-checkbox {
   max-width: 24rem;
   margin-top: 0.75rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Toggle Group (adr/0026). CUSTOM-ELEMENT: this library's first      */
+/* roving-focus consumer (assets/js/lib/roving-focus.js) -- see       */
+/* prolog/ui/toggle_group.pl's module header for the full contract.   */
+/* Root (`.px-toggle-group`) is a joined-button strip; every Item      */
+/* (`.px-toggle-group-item`) shares `.px-toggle`'s look-and-feel      */
+/* (same `[data-state="on"]` styling hook -- Toggle Group Items ARE   */
+/* Toggles) but with the outer corners rounded and a shared divider   */
+/* border between Items instead of each button owning its own         */
+/* rounded border. `[data-orientation="vertical"]` flips the strip    */
+/* from a row to a column (and the divider from vertical to           */
+/* horizontal) -- purely presentational, the same attribute            */
+/* `<px-toggle-group>` reads to pick roving-focus's orientation.       */
+/* ---------------------------------------------------------------- */
+
+px-toggle-group {
+  display: inline-block;
+}
+
+.px-toggle-group {
+  display: inline-flex;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.px-toggle-group[data-orientation="vertical"] {
+  flex-direction: column;
+}
+
+.px-toggle-group[data-disabled] {
+  opacity: 0.6;
+}
+
+.px-toggle-group-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  padding: 0 0.85rem;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.px-toggle-group-item:last-child {
+  border-right: none;
+}
+
+.px-toggle-group[data-orientation="vertical"] .px-toggle-group-item {
+  border-right: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.px-toggle-group[data-orientation="vertical"] .px-toggle-group-item:last-child {
+  border-bottom: none;
+}
+
+.px-toggle-group-item:hover:not(:disabled) {
+  background: rgba(125, 211, 252, 0.12);
+}
+
+.px-toggle-group-item:focus-visible {
+  outline: none;
+  position: relative;
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.px-toggle-group-item[data-state="on"] {
+  background: var(--accent);
+  color: #0f1115;
+}
+
+.px-toggle-group-item:disabled,
+.px-toggle-group-item[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Demo layout (px_ui:demo(toggle_group, ...), /ui/toggle_group). */
+
+.px-toggle-group-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 28rem;
+}
+
+.px-toggle-group-demo h3 {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-toggle-group-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-toggle-group-demo p {
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
