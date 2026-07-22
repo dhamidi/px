@@ -29,3 +29,11 @@ import "components/toggle_group";
 // Triggers, plus automatic (focus-driven) activation switching
 // aria-selected/data-state/hidden across Triggers/Content.
 import "components/tabs";
+// <px-toolbar> is ui/toolbar.pl's (adr/0026): another roving-focus
+// consumer -- ONE arrow-key/Home/End scope spanning every Button, Link
+// and embedded Toggle Group Item as a single flat tab-stop domain, plus
+// the Link Space-key patch. Reaches into any nested <px-toggle-group>
+// to disable ITS independent roving-focus scope (see the component's
+// own header) -- must load after "components/toggle_group" so that
+// reach-in target is registered first.
+import "components/toolbar";

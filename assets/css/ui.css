@@ -1134,3 +1134,108 @@ px-tabs {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Toolbar (adr/0026). CUSTOM-ELEMENT: this library's second          */
+/* roving-focus consumer (assets/js/lib/roving-focus.js), spanning ONE */
+/* flat tab-stop domain across heterogeneous children -- see           */
+/* prolog/ui/toolbar.pl's module header for the full contract.        */
+/* `.px-toolbar` is a plain flex row (or column, orientation=vertical) */
+/* of loosely-spaced items -- unlike Toggle Group's joined-button      */
+/* strip, Toolbar's Buttons/Links are visually independent, each       */
+/* individually rounded. An embedded `.px-toggle-group` (see the       */
+/* "Toggle Group" section above) is left with its own joined-strip     */
+/* look untouched -- only its keyboard roving-focus defers to the      */
+/* parent (assets/js/components/toolbar.js), never its visuals.        */
+/* ---------------------------------------------------------------- */
+
+px-toolbar {
+  display: block;
+}
+
+.px-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.px-toolbar[data-orientation="vertical"] {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.px-toolbar-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.px-toolbar-item:hover:not(:disabled) {
+  background: rgba(125, 211, 252, 0.12);
+}
+
+.px-toolbar-item:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.px-toolbar-item:disabled,
+.px-toolbar-item[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.px-toolbar .px-toggle-group {
+  margin: 0 0.15rem;
+}
+
+.px-toolbar-separator.px-separator[data-orientation="vertical"] {
+  height: 1.5rem;
+  margin: 0 0.15rem;
+}
+
+.px-toolbar-separator.px-separator[data-orientation="horizontal"] {
+  margin: 0.35rem 0;
+}
+
+/* Demo layout (px_ui:demo(toolbar, ...), /ui/toolbar). */
+
+.px-toolbar-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 32rem;
+}
+
+.px-toolbar-demo h3 {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-toolbar-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-toolbar-demo p {
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
