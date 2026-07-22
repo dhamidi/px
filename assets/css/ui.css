@@ -261,3 +261,79 @@
 .ui-demo-label .field {
   max-width: 20rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Toggle (adr/0026). NATIVE-capable: `<button type="button"          */
+/* aria-pressed data-state="on|off">` carries the whole contract on   */
+/* every server render -- see prolog/ui/toggle.pl's module header.    */
+/* `data-state` (not `aria-pressed`, which browsers don't expose to   */
+/* CSS selectors as reliably across the board) is the styling hook,   */
+/* same convention as every other stateful component in this file.   */
+/* `<px-toggle>` (the wrapper custom element, assets/js/components/   */
+/* toggle.js) carries no styling contract of its own -- it is a       */
+/* plain inline wrapper so the button inside lays out exactly as if   */
+/* it were unwrapped, JS loaded or not.                                */
+/* ---------------------------------------------------------------- */
+
+px-toggle {
+  display: inline-block;
+}
+
+.px-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  padding: 0 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.px-toggle:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.px-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+}
+
+.px-toggle[data-state="on"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #0f1115;
+}
+
+.px-toggle:disabled,
+.px-toggle[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Demo layout (px_ui:demo(toggle, ...), /ui/toggle). */
+
+.px-toggle-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 24rem;
+}
+
+.px-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.px-toggle-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
