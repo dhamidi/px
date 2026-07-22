@@ -88,3 +88,13 @@ import "components/tooltip";
 // components/popover.js. Mouse-pointer only; never opens via focus,
 // click, or touch, matching upstream's hover-only-by-design scope.
 import "components/hover_card";
+// <px-dropdown-menu> is ui/dropdown_menu.pl's (adr/0026): "lib/menu"'s
+// proving consumer -- the shared Menu engine (roving highlight,
+// typeahead, submenu hover-delay/keyboard/positioning via "lib/popper",
+// checkbox/radio toggling, close-on-select) ported once as shared
+// infrastructure for Dropdown Menu now and Context Menu/Menubar next.
+// Trigger's native `popovertarget` and Content's native `popover=
+// "auto"` already open/close/dismiss with zero JS; this element adds
+// ArrowDown-always-opens, auto-focus-first-item on every open path,
+// and installs "lib/menu" onto Content once at connect time.
+import "components/dropdown_menu";

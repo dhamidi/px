@@ -2286,3 +2286,269 @@ px-hover-card,
   gap: 2.5rem;
   padding: 2rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Menu shared machinery (adr/0026): prolog/ui/_menu.pl's part        */
+/* templates, keyed off the same role/data-state/[data-side]/         */
+/* [data-align] contract every other menu wrapper (Dropdown Menu       */
+/* first, Context Menu/Menubar next) shares -- this section styles     */
+/* the parts, not any one wrapper. `[data-highlighted]` is the one     */
+/* selector never emitted server-side (assets/js/lib/menu.js's own     */
+/* job, mirroring live DOM focus) -- see that file's header.           */
+/* ---------------------------------------------------------------- */
+
+.px-menu-content {
+  position: fixed; /* overwritten with an explicit left/top by lib/popper.js while open */
+  margin: 0;        /* override the UA popover stylesheet's centering margin */
+  min-width: 14rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.px-menu-content:not(:popover-open) {
+  display: none;
+}
+
+.px-menu-content:popover-open {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@starting-style {
+  .px-menu-content:popover-open {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.px-menu-content {
+  transition: opacity 0.1s ease-out, transform 0.1s ease-out;
+}
+
+/* Every menu row -- plain Item, CheckboxItem, RadioItem, SubTrigger
+   (each of the latter three additionally carries .px-menu-item, per
+   prolog/ui/_menu.pl's own merged-class convention) -- shares this
+   base row treatment; [data-highlighted] (never server-rendered, see
+   the section header) is the single visual "current" state, replacing
+   the native focus ring so keyboard/pointer highlight-follow always
+   reads identically. */
+.px-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  position: relative;
+}
+
+.px-menu-item[data-highlighted] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.px-menu-item[data-disabled] {
+  color: var(--muted);
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* CheckboxItem/RadioItem reserve a leading column for the Indicator
+   (checkmark/dot) so their label text lines up with plain Items that
+   have none. */
+.px-menu-checkbox-item,
+.px-menu-radio-item {
+  padding-left: 2rem;
+}
+
+.px-menu-item-indicator {
+  position: absolute;
+  left: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+/* Documented simplification (prolog/ui/_menu.pl's header): the
+   Indicator is ALWAYS rendered, never Presence-gated -- this is the
+   CSS half of that choice, hiding it visually rather than omitting it
+   from the DOM. */
+.px-menu-item-indicator[data-state="unchecked"] {
+  visibility: hidden;
+}
+
+.px-menu-label {
+  padding: 0.4rem 0.6rem 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.px-menu-radio-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.px-menu-separator {
+  margin: 0.35rem 0.3rem;
+}
+
+/* Demo-only: a right-aligned shortcut label inside a plain Item
+   (px_ui:demo(dropdown_menu, ...) -- "Cut ⌘X" etc). */
+.px-menu-shortcut {
+  margin-left: auto;
+  padding-left: 1.5rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-menu-item[data-highlighted] .px-menu-shortcut {
+  color: var(--accent-contrast);
+  opacity: 0.85;
+}
+
+/* Sub: a plain wrapper (prolog/ui/_menu.pl's header explains why it
+   exists) -- `display: contents` so SubTrigger participates in the
+   parent Content's own flex column exactly like a plain Item, and
+   SubContent (position: fixed while open, promoted to the top layer)
+   is unaffected by it either way. */
+.px-menu-sub {
+  display: contents;
+}
+
+.px-menu-sub-trigger::after {
+  content: "";
+  margin-left: auto;
+  padding-left: 1.5rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.7;
+}
+
+.px-menu-sub-content {
+  min-width: 12rem;
+}
+
+/* Arrow: identical shape/positioning technique to .px-popover-arrow,
+   keyed off the parent Content's own [data-side] -- available to any
+   future menu wrapper that mounts menu_arrow/1 (none of this port's
+   own demos do; Radix's own DropdownMenu.Content rarely ships one
+   either, a plain drop-shadow panel is the common case). */
+.px-menu-arrow {
+  position: absolute;
+  width: 0.6rem;
+  height: 0.6rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+
+.px-menu-content[data-side="top"] > .px-menu-arrow {
+  bottom: -0.35rem;
+  left: 1rem;
+  border-top: none;
+  border-left: none;
+}
+
+.px-menu-content[data-side="bottom"] > .px-menu-arrow {
+  top: -0.35rem;
+  left: 1rem;
+  border-bottom: none;
+  border-right: none;
+}
+
+.px-menu-content[data-side="left"] > .px-menu-arrow {
+  right: -0.35rem;
+  top: 1rem;
+  border-bottom: none;
+  border-left: none;
+}
+
+.px-menu-content[data-side="right"] > .px-menu-arrow {
+  left: -0.35rem;
+  top: 1rem;
+  border-top: none;
+  border-right: none;
+}
+
+/* ---------------------------------------------------------------- */
+/* Dropdown Menu (adr/0026): prolog/ui/dropdown_menu.pl -- the Trigger */
+/* plus the demo layout; Content/Item/etc. all reuse the shared        */
+/* px-menu-* classes above.                                            */
+/* ---------------------------------------------------------------- */
+
+px-dropdown-menu {
+  display: contents;
+}
+
+.px-dropdown-menu {
+  display: contents;
+}
+
+.px-dropdown-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.px-dropdown-menu-trigger:hover {
+  border-color: var(--accent);
+}
+
+.px-dropdown-menu-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+}
+
+.px-dropdown-menu-trigger[data-state="open"] {
+  border-color: var(--accent);
+}
+
+.px-dropdown-menu-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 32rem;
+}
+
+.px-dropdown-menu-demo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-dropdown-menu-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
