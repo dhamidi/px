@@ -8,3 +8,6 @@ import "turbo";
 // px_ui components (adr/0026): each ships its own custom element,
 // registered on import here. <px-toggle> is ui/toggle.pl's.
 import "components/toggle";
+// <px-avatar> is ui/avatar.pl's (adr/0026): watches its <img> for
+// load/error and reflects the result onto its own data-state attribute.
+import "components/avatar";

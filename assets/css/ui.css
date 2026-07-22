@@ -450,3 +450,95 @@ px-toggle {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Avatar (adr/0026). CUSTOM-ELEMENT (small): no data-state upstream, */
+/* but the analysis doc's own "Interactivity class" paragraph         */
+/* prescribes adding one here for exactly this CSS to key off (see    */
+/* prolog/ui/avatar.pl's module header for the full contract/         */
+/* rationale). Root (.px-avatar, a <px-avatar> custom element) and    */
+/* Image/Fallback are stacked in the SAME CSS grid cell so ordinary   */
+/* paint order -- Image painted after Fallback in the DOM -- already  */
+/* covers the fallback the instant the image has real pixels, with    */
+/* zero JS: [data-state] below only handles what paint order alone    */
+/* cannot -- hiding a genuinely broken image's placeholder icon, and  */
+/* belt-and-braces hiding the fallback once "loaded" is confirmed for */
+/* a translucent image that paint order alone wouldn't fully cover.   */
+/* ---------------------------------------------------------------- */
+
+.px-avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 3rem;
+  height: 3rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  user-select: none;
+  vertical-align: middle;
+}
+
+.px-avatar-image,
+.px-avatar-fallback {
+  grid-area: 1 / 1;
+}
+
+.px-avatar-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.px-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--muted);
+  background: var(--panel);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Confirmed loaded (custom element only -- no CSS-only way to know):
+   hide the fallback outright, on top of the paint-order cover it
+   already has by default. */
+px-avatar[data-state="loaded"] .px-avatar-fallback {
+  display: none;
+}
+
+/* Confirmed broken (custom element only -- no `:error`/`:broken`
+   pseudo-class exists): hide the image's placeholder icon so the
+   fallback underneath -- already visible since first paint -- is the
+   only thing shown. */
+px-avatar[data-state="error"] .px-avatar-image {
+  display: none;
+}
+
+/* Demo layout (px_ui:demo(avatar, ...), /ui/avatar). */
+
+.px-avatar-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 34rem;
+}
+
+.px-avatar-demo-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.px-avatar-demo-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
