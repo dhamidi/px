@@ -98,3 +98,17 @@ import "components/hover_card";
 // ArrowDown-always-opens, auto-focus-first-item on every open path,
 // and installs "lib/menu" onto Content once at connect time.
 import "components/dropdown_menu";
+// <px-context-menu> is ui/context_menu.pl's (adr/0026): "lib/menu"'s
+// second consumer -- Dropdown Menu's closest sibling, minus a real
+// trigger element, plus a pointer-anchored open path. Content's native
+// `popover="auto"` still gives Escape/outside-click dismiss with zero
+// JS, but OPENING has no native equivalent at all (no click-triggered
+// `popovertarget` exists for the `contextmenu` event or a long-press
+// gesture) -- this element's own job is preventDefault()-ing the
+// native contextmenu event (mouse) / running a 700ms long-press timer
+// (touch/pen), anchoring Content to the pointer's exact point via a
+// virtual anchor object ("lib/popper"'s position() only ever calls
+// anchorEl.getBoundingClientRect(), so a plain JS object works), and
+// installing "lib/menu" onto Content once at connect time -- same
+// engine Dropdown Menu already proved out.
+import "components/context_menu";

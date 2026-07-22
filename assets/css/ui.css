@@ -2552,3 +2552,76 @@ px-dropdown-menu {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Context Menu (adr/0026): prolog/ui/context_menu.pl -- Trigger plus  */
+/* demo trigger-area styling only; Content/Item/etc. all reuse the     */
+/* shared px-menu-* classes above (side="right" align="start"          */
+/* side-offset="2" defaults, per context_menu.pl's own header -- no    */
+/* new Content CSS needed here at all).                                */
+/* ---------------------------------------------------------------- */
+
+px-context-menu {
+  display: contents;
+}
+
+.px-context-menu {
+  display: contents;
+}
+
+/* A `<span>` wrapping arbitrary (often block-level) page content --
+   see prolog/ui/context_menu.pl's header for why it's a span, not a
+   div; `display: block` here so that arbitrary content lays out
+   normally rather than in an inline formatting context. */
+.px-context-menu-trigger {
+  display: block;
+}
+
+.px-context-menu-trigger[data-disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.px-context-menu-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 32rem;
+}
+
+.px-context-menu-demo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-context-menu-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Demo-only: the dashed "right-click here" target area -- the one
+   genuinely new visual surface this port introduces (everything else
+   reuses the shared px-menu-* classes wholesale, per the section
+   header above). */
+.px-context-menu-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 10rem;
+  border: 2px dashed var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  user-select: none;
+  cursor: context-menu;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.px-context-menu-area:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
