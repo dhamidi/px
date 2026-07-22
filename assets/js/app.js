@@ -54,3 +54,11 @@ import "components/toolbar";
 // events, keeping it positioned via popper.js's `autoUpdate` while
 // open.
 import "components/popover";
+// <px-dialog> is ui/dialog.pl's (adr/0026): native <dialog> +
+// showModal() already gives top-layer stacking, ::backdrop, Escape-to-
+// close and a basic focus trap with zero JS; this element only adds
+// what the platform doesn't -- body scroll-lock while open and
+// outside-click (backdrop) light-dismiss for the modal case -- plus
+// keeping the Trigger's aria-expanded/data-state in sync with
+// Content's own data-state across every close path.
+import "components/dialog";

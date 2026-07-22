@@ -1562,3 +1562,196 @@ px-popover {
   padding: 2rem;
 }
 
+/* ---------------------------------------------------------------- */
+/* Dialog (adr/0026). CUSTOM-ELEMENT, substantially platform-assisted: */
+/* native <dialog> + showModal() gives top-layer stacking, ::backdrop  */
+/* (replacing Radix's Overlay -- there is no separate Overlay element  */
+/* in this port; see prolog/ui/dialog.pl's module header's "Portal/    */
+/* Overlay collapse" section for why), Escape-to-close and a basic     */
+/* focus trap for free; <px-dialog> (assets/js/components/dialog.js)   */
+/* only adds scroll-lock and outside-click light-dismiss on top. Every */
+/* rule below targets [data-state] plus the native ::backdrop pseudo-  */
+/* element -- the same styling contract upstream Radix's own Dialog    */
+/* ships (data-state-keyed), despite there being no Overlay DOM node.  */
+/* ---------------------------------------------------------------- */
+
+px-dialog,
+.px-dialog {
+  display: contents;   /* the wrapper carries no layout of its own -- Trigger and the top-layer <dialog> lay out as if px-dialog/its div were not there */
+}
+
+.px-dialog-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.px-dialog-trigger:hover {
+  border-color: var(--accent);
+}
+
+.px-dialog-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+}
+
+.px-dialog-trigger[data-state="open"] {
+  border-color: var(--accent);
+}
+
+/* The native UA stylesheet already centers a modal <dialog> (`position:
+   fixed; inset: 0; margin: auto`) and hides it entirely while closed
+   (`dialog:not([open]) { display: none }`) -- both free, nothing here
+   duplicates that. This only supplies the panel look plus a cheap
+   open-transition. */
+.px-dialog-content {
+  position: relative;   /* anchors the absolutely-positioned Close button */
+  padding: 1.5rem;
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 4rem);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Cheap open animation via data-state (rule 6's "tasteful defaults"
+   bar, not a full Presence port -- see prolog/ui/dialog.pl's header):
+   @starting-style covers the "just promoted to the top layer" frame
+   with zero JS wait-for-animationend state machine, the exact
+   replacement adr/0026's own shared-machinery notes call out for
+   react-presence's common case. Close has no matching exit transition
+   (native close is instant) -- same base behavior as every other
+   static-by-default part of this library. */
+@starting-style {
+  .px-dialog-content[data-state="open"] {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.px-dialog-content::backdrop {
+  background: rgba(4, 6, 10, 0.6);
+}
+
+.px-dialog-title {
+  margin: 0 0 0.5rem;
+  padding-right: 1.75rem;   /* keep clear of the absolutely-positioned Close button */
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.px-dialog-description {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.px-dialog-description:last-of-type {
+  margin-bottom: 0;
+}
+
+.px-dialog-close {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.px-dialog-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.px-dialog-close:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.px-dialog-save {
+  margin-top: 0.25rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--bg);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Demo layout (px_ui:demo(dialog, ...), /ui/dialog). */
+
+.px-dialog-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 32rem;
+}
+
+.px-dialog-demo h3 {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-dialog-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-dialog-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-dialog-demo form p {
+  margin: 0 0 0.75rem;
+  color: var(--text);
+}
+
+.px-dialog-demo label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.px-dialog-demo input[type="text"] {
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.px-dialog-demo input[type="text"]:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
