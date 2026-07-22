@@ -62,3 +62,15 @@ import "components/popover";
 // keeping the Trigger's aria-expanded/data-state in sync with
 // Content's own data-state across every close path.
 import "components/dialog";
+// <px-tooltip> is ui/tooltip.pl's (adr/0026): "lib/popper"'s second
+// consumer. Content's native `popover="manual"` gives top-layer
+// stacking with zero JS auto-dismiss/single-open behavior to fight
+// (unlike Popover's "auto", hover semantics need fully custom control
+// over when to show/hide); this element supplies that control --
+// delay/skip-delay timer coordination (delayDuration 700ms,
+// skipDelayDuration 300ms, both Radix defaults) via a module-level
+// shared "last closed at" timestamp, single-open-at-a-time
+// enforcement, pointerenter/focus to open and pointerleave/blur/
+// Escape to close immediately, touch pointers ignored -- plus
+// position/autoUpdate for placement, same as components/popover.js.
+import "components/tooltip";

@@ -1604,6 +1604,182 @@ px-popover {
 }
 
 /* ---------------------------------------------------------------- */
+/* Tooltip (adr/0026). CUSTOM-ELEMENT, least platform-replaceable of  */
+/* the overlay family: Content's native `popover="manual"` gives      */
+/* top-layer stacking with zero JS auto-dismiss to fight (see         */
+/* prolog/ui/tooltip.pl's module header, "Platform choice", for why   */
+/* `manual` rather than Popover's `auto`); <px-tooltip>                */
+/* (assets/js/components/tooltip.js) supplies the delay/skip-delay    */
+/* timer coordination, positioning (lib/popper.js, same contract as   */
+/* Popover) and open/close event wiring -- none of it has a platform  */
+/* analog. A dark, near-black bubble regardless of the app's own      */
+/* panel color -- Radix's own Tooltip content is always a solid dark  */
+/* chip even inside a light theme; this app is dark-native already    */
+/* (`--panel: #161a21`) so the bubble uses a deliberately DARKER,      */
+/* almost-black tone than `--panel` for the same "always reads as a   */
+/* separate floating chip" contrast Radix's own docs site shows.      */
+/* Every rule below targets [data-state]/[data-side]/[data-align],    */
+/* the same popper.js styling contract Popover already ships.         */
+/* ---------------------------------------------------------------- */
+
+px-tooltip {
+  display: contents;
+}
+
+.px-tooltip {
+  display: contents;
+}
+
+.px-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.px-tooltip-trigger:hover {
+  border-color: var(--accent);
+}
+
+.px-tooltip-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+}
+
+/* Tooltip Content is promoted to the top layer by the native
+   `popover` attribute regardless of its DOM position, so `position:
+   fixed`/`left`/`top` (written by lib/popper.js's `position/3`) place
+   it correctly relative to the viewport with no portal machinery
+   needed -- same reasoning as .px-popover-content. A deliberately
+   small, low-chrome bubble (no border -- a shadow alone reads as
+   "floating" at this size) -- short hint text, not rich content. */
+.px-tooltip-content {
+  margin: 0;                     /* override the UA popover stylesheet's centering margin */
+  /* The UA `[popover]` stylesheet also sets `border: solid` (resolves
+     to a 3px `currentColor` ring -- i.e. this rule's own `color`,
+     ugly and unintended) and `overflow: auto` (a classic-scrollbar
+     spin-arrow control can appear since the Arrow child below is
+     deliberately positioned partly OUTSIDE the box via a negative
+     offset) -- both explicitly reset here, the same "override the UA
+     popover stylesheet" posture as `margin: 0` above; caught live via
+     CDP screenshot per adr/0026 rule 7(c) -- markup-only checks never
+     would have (border/overflow use UA-stylesheet-computed values,
+     invisible to a render-test string assertion). */
+  border: none;
+  overflow: visible;
+  padding: 0.4rem 0.7rem;
+  max-width: 18rem;
+  border-radius: 6px;
+  background: #0b0d11;
+  color: var(--text);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  pointer-events: none;          /* hint bubble, never itself a hover/click target */
+}
+
+.px-tooltip-content:not(:popover-open) {
+  display: none;
+}
+
+/* Subtle fade keyed off data-state -- delayed-open/instant-open both
+   read as "open" for styling purposes (the distinction is behavioral,
+   not visual: instant-open exists so the skip-delay fast path can be
+   asserted on/tested, not so it looks different). closed is only ever
+   seen mid-`animationend`/removal, covered by the same rule the
+   popover/dialog ports rely on their close-transition CSS for. */
+.px-tooltip-content[data-state="delayed-open"],
+.px-tooltip-content[data-state="instant-open"] {
+  animation: px-tooltip-fade-in 0.12s ease-out;
+}
+
+@keyframes px-tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Arrow: a plain rotated square matching the dark bubble, positioned
+   at the panel's edge facing the trigger -- keyed off Content's own
+   [data-side], same convention as .px-popover-arrow. */
+.px-tooltip-arrow {
+  position: absolute;
+  width: 0.5rem;
+  height: 0.5rem;
+  background: #0b0d11;
+  transform: rotate(45deg);
+}
+
+.px-tooltip-content[data-side="top"] > .px-tooltip-arrow {
+  bottom: -0.2rem;
+  left: 50%;
+  margin-left: -0.25rem;
+}
+
+.px-tooltip-content[data-side="bottom"] > .px-tooltip-arrow {
+  top: -0.2rem;
+  left: 50%;
+  margin-left: -0.25rem;
+}
+
+.px-tooltip-content[data-side="left"] > .px-tooltip-arrow {
+  right: -0.2rem;
+  top: 50%;
+  margin-top: -0.25rem;
+}
+
+.px-tooltip-content[data-side="right"] > .px-tooltip-arrow {
+  left: -0.2rem;
+  top: 50%;
+  margin-top: -0.25rem;
+}
+
+/* Demo layout (px_ui:demo(tooltip, ...), /ui/tooltip). */
+
+.px-tooltip-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 40rem;
+}
+
+.px-tooltip-demo h3 {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-tooltip-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-tooltip-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-tooltip-sides-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  padding: 2rem;
+}
+
+/* ---------------------------------------------------------------- */
 /* Dialog (adr/0026). CUSTOM-ELEMENT, substantially platform-assisted: */
 /* native <dialog> + showModal() gives top-layer stacking, ::backdrop  */
 /* (replacing Radix's Overlay -- there is no separate Overlay element  */
