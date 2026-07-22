@@ -91,6 +91,7 @@ layout(Title, Content) ~>
             [ meta(charset("utf-8")),
               title(Title),
               stylesheet_tag("css/app.css"),
+              stylesheet_tag("css/ui.css"),
               \javascript_importmap_tags
             ]),
           body(div(class(page), Content))
