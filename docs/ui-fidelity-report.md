@@ -278,3 +278,72 @@ prior defect is fixed; dialog's backdrop is correct despite the
 screenshot artifact) or a demo-content polish choice (toolbar icons,
 dialog/popover button copy and density) rather than a component
 styling or behavior bug.
+
+## Polish applied (2026-07-22, follow-up pass)
+
+All five prioritized fixes above landed, plus the contrast audit the
+accent swap requires. Verified via `test/ui/*.pl` (all 19 files green,
+including `css_coverage`), a service restart with served-hash
+byte-size + diff verification (`app.css` 6438 B, `ui.css` 49080 B,
+both byte-identical to the working tree -- no truncation), and a fresh
+CDP pass over `/headless-shell` against `:8090` (screenshots:
+`docs/fidelity-shots/polish-*.png`).
+
+1. **Accent swap + contrast audit.** `--accent` is now `#3E63DD`
+   (`assets/css/app.css`). Three new vars ship alongside it:
+   `--accent-contrast: #ffffff` (on-accent text/glyphs -- switched to
+   this everywhere an `--accent` *background* carries text: the form
+   submit button, `.px-icon-button`, `.px-toggle[data-state="on"]`,
+   `.px-toggle-group-item[data-state="on"]`, the checkbox
+   checkmark/indeterminate-dash glyphs, and `.px-dialog-save`, all of
+   which previously hardcoded dark `#0f1115` or `var(--bg)` text that
+   read fine on the old pale `#7dd3fc` and would have gone
+   unreadable-to-low-contrast on the new indigo); `--accent-hover:
+   #5472e4` (a lighter hover variant, wired into every one of those
+   same filled-accent surfaces' `:hover`, replacing the old
+   `filter: brightness()` trick where present); `--accent-text:
+   #849dff` (a lighter indigo for link/text use on the near-black page
+   background -- `a`, `.adr-list a:hover` -- since plain `#3E63DD`
+   reads dark for body-copy-sized text on `#0f1115`). All hardcoded
+   `rgba(125, 211, 252, ...)` focus-ring/hover-wash colors (9 spots in
+   `ui.css`, 2 in `app.css`) were also updated to `rgba(62, 99, 221,
+   ...)` so focus rings/hover washes match the new accent instead of
+   the old pastel. Expected grade: switch/checkbox/radio_group/
+   progress/toggle/toggle_group/toolbar A (color family now matches
+   Radix; radio_group/checkbox/tabs/etc. stay A).
+2. **Progress track**: height `0.6rem` (9.6px) -> `0.375rem` (6px,
+   exact match to Radix's computed value); background switched from a
+   solid `var(--panel)` fill to the translucent wash Radix itself
+   computes, `rgba(221, 234, 248, 0.08)`. Expected grade: B -> A.
+3. **Avatar**: default size `3rem` (48px) -> `2.5rem` (40px, exact
+   match); default radius `999px` (circle) -> `0.375rem` (6px rounded
+   square, matching Radix Themes' documented default). Circle is now
+   opt-in via a new `radius(square|full)` option on `avatar_root`/
+   `avatar/4` (`prolog/ui/avatar.pl`'s `take_radius/3`), rendered as
+   `data-radius="square"/"full"` and targeted by
+   `.px-avatar[data-radius="full"] { border-radius: 999px; }` in
+   `ui.css`. `test/ui/avatar.pl` updated (new `root_radius_*`/
+   `root_invalid_radius_falls_back` checks, updated exact-string
+   assertions for the new attribute, a 5th demo row exercising
+   `radius(full)`); `css_coverage.pl` needed no code changes since the
+   new rule keys off `[data-radius=...]` on the already-covered
+   `.px-avatar` class, not a new selector -- reran green regardless.
+   Expected grade: B -> A.
+4. **Switch**: track `2.5rem x 1.4rem` (40x22.4px) -> `2.1875rem x
+   1.25rem` (35x20px, within Radix's 35x18-20px computed range); thumb
+   trimmed proportionally to `1rem` (16px) with a 2px inset on all
+   sides and a 15px checked-state travel distance, recomputed from the
+   new track dimensions. Verified interactivity survived the resize
+   (real CDP click still flips `data-state`/thumb position). Expected
+   grade: B -> A.
+5. **aspect_ratio**: `[data-radix-aspect-ratio-wrapper]`'s
+   `border-radius` bumped `8px -> 12px` for a clearer rounded-corner
+   read at demo-box scale (confirmed already-correct `overflow:
+   hidden` clipping was in place -- the 8px value just read as
+   near-square next to the reference's more visibly rounded photo
+   frame). Expected grade: B -> A/B (structural fix confirmed via
+   `getComputedStyle`; a matter of degree, not correctness).
+
+Not touched in this pass (out of scope per the report's own "demo
+content, not styling" calls): toolbar icon glyphs, dialog Cancel/Save
+button pair, popover content density.

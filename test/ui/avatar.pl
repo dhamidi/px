@@ -94,6 +94,8 @@ tests :-
           contains(Root0, "class=\"px-avatar\"")),
     check(root_default_state_loading,
           contains(Root0, "data-state=\"loading\"")),
+    check(root_default_radius_square,
+          contains(Root0, "data-radius=\"square\"")),
     check(root_no_role,
           not_contains(Root0, "role=")),
     check(root_no_aria,
@@ -101,7 +103,20 @@ tests :-
     check(root_renders_children,
           contains(Root0, ">x</px-avatar>")),
     check(root_exact,
-          Root0 == "<px-avatar class=\"px-avatar\" data-state=\"loading\">x</px-avatar>"),
+          Root0 == "<px-avatar class=\"px-avatar\" data-state=\"loading\" data-radius=\"square\">x</px-avatar>"),
+
+    % radius(full) opts into the circle variant; radius(square) is
+    % explicit-but-equivalent to the default; an invalid radius(_)
+    % falls back to "square" -- same shape as take_state/valid_state.
+    render_to_string(avatar_root([radius(full)], []), RootRadiusFull),
+    check(root_radius_full,
+          contains(RootRadiusFull, "data-radius=\"full\"")),
+    render_to_string(avatar_root([radius(square)], []), RootRadiusSquare),
+    check(root_radius_square_explicit,
+          contains(RootRadiusSquare, "data-radius=\"square\"")),
+    render_to_string(avatar_root([radius(bogus)], []), RootRadiusBogus),
+    check(root_invalid_radius_falls_back,
+          contains(RootRadiusBogus, "data-radius=\"square\"")),
 
     % avatar_root/1 (no Children arg) == avatar_root/2 with [].
     render_to_string(avatar_root([]), Root1a),
@@ -229,7 +244,7 @@ tests :-
           contains(FallbackOnly, "<span class=\"px-avatar-fallback\">FB</span>")),
     check(fallback_only_exact,
           FallbackOnly ==
-              "<px-avatar class=\"px-avatar\" data-state=\"loading\" id=\"fb-only\"><span class=\"px-avatar-fallback\">FB</span></px-avatar>"),
+              "<px-avatar class=\"px-avatar\" data-state=\"loading\" data-radius=\"square\" id=\"fb-only\"><span class=\"px-avatar-fallback\">FB</span></px-avatar>"),
 
     % ===================================================================
     % Kitchen-sink demo (px_ui:demo/3), rendered exactly the way
@@ -245,8 +260,8 @@ tests :-
 
     render_to_string(div(class("ui-demo"), \avatar_demo), Demo),
 
-    check(demo_has_four_avatars,
-          count_occurrences(Demo, "<px-avatar ", 4)),
+    check(demo_has_five_avatars,
+          count_occurrences(Demo, "<px-avatar ", 5)),
     check(demo_working_image_src,
           contains(Demo, "data:image/png;base64,")),
     check(demo_broken_src,
@@ -257,10 +272,15 @@ tests :-
           ( sub_string(Demo, B, _, _, "avatar-demo-fallback-only"),
             sub_string(Demo, B, _, 0, After),
             not_contains(After, "<img") )),
+    check(demo_has_default_square_radius,
+          contains(Demo, "data-radius=\"square\"")),
+    check(demo_has_full_radius_opt_in,
+          contains(Demo, "data-radius=\"full\"")),
     check(demo_labels,
           ( contains(Demo, "Working image"),
             contains(Demo, "Broken src"),
-            contains(Demo, "Fallback-only") )),
+            contains(Demo, "Fallback-only"),
+            contains(Demo, "radius(full)") )),
 
     % show some real output for the record
     format("~n--- rendered avatar_demo ---~n~w~n----------------------------~n",

@@ -3,7 +3,25 @@
   --panel: #161a21;
   --text: #e6e8eb;
   --muted: #9aa4b2;
-  --accent: #7dd3fc;
+  /* Radix Themes' own computed indicator color (rgb(62, 99, 221)),
+     confirmed live against radix-ui.com/themes/docs/components/progress
+     -- docs/ui-fidelity-report.md's highest-leverage fix. This used to
+     be a pale sky-blue (#7dd3fc) that was readable with dark (#0f1115)
+     text on top of it; #3E63DD is darker/more saturated and FAILS that
+     same dark-on-accent pairing, hence the three companion vars below. */
+  --accent: #3E63DD;
+  /* On-accent foreground: use for any text/glyph painted on top of an
+     --accent-filled background (buttons, checked switch/checkbox/toggle
+     fills, ...). White clears WCAG AA comfortably against #3E63DD. */
+  --accent-contrast: #ffffff;
+  /* Hover/active variant of --accent -- a touch lighter, for filled
+     accent surfaces (buttons, checked-state controls) on :hover. */
+  --accent-hover: #5472e4;
+  /* Lighter indigo for TEXT usage (links, inline accents) directly on
+     the dark page background -- plain --accent reads too dark/low-
+     contrast for body-copy-sized link text on #0f1115; matches Radix's
+     own lighter indigo link tint on dark themes. */
+  --accent-text: #849dff;
   --border: #262b34;
   --code-bg: #1c2129;
   --danger: #f87171;
@@ -36,7 +54,7 @@ h2 { font-size: 1.35rem; margin-top: 2rem; border-bottom: 1px solid var(--border
 
 p { color: var(--text); }
 
-a { color: var(--accent); text-decoration: none; }
+a { color: var(--accent-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 .adr-list {
@@ -65,7 +83,7 @@ a:hover { text-decoration: underline; }
 .adr-list a:hover {
   background: var(--panel);
   text-decoration: none;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .back { margin-bottom: 1.5rem; }
@@ -178,7 +196,7 @@ textarea:focus,
 select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.25);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.25);
 }
 
 .field-error input[type="text"],
@@ -211,27 +229,29 @@ button[type="submit"],
 input[type="submit"] {
   display: inline-block;
   background: var(--accent);
-  color: #0f1115;
+  /* was #0f1115 (dark) -- readable on the old pale #7dd3fc, fails on
+     the new saturated #3E63DD indigo; --accent-contrast is white. */
+  color: var(--accent-contrast);
   border: none;
   border-radius: 8px;
   padding: 0.65rem 1.5rem;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: filter 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 form button:hover,
 form input[type="submit"]:hover,
 button[type="submit"]:hover,
 input[type="submit"]:hover {
-  filter: brightness(1.12);
+  background: var(--accent-hover);
 }
 
 form button:focus-visible,
 form input[type="submit"]:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }
 
 /* ---------------------------------------------------------------- */

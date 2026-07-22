@@ -18,7 +18,11 @@
   display: block;
   width: 100%;
   overflow: hidden;
-  border-radius: 8px;
+  /* was 8px -- reads as near-square at demo box size next to the
+     reference's more visibly rounded photo frame
+     (docs/ui-fidelity-report.md); bumped for a clearer rounded-corner
+     read. */
+  border-radius: 12px;
   background: var(--panel);
 }
 
@@ -138,23 +142,24 @@
   align-items: center;
   gap: 0.5rem;
   background: var(--accent);
-  color: #0f1115;
+  /* was #0f1115 -- fails contrast on the new saturated indigo accent. */
+  color: var(--accent-contrast);
   border: none;
   border-radius: 8px;
   padding: 0.55rem 1.1rem;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: filter 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .px-icon-button:hover {
-  filter: brightness(1.12);
+  background: var(--accent-hover);
 }
 
 .px-icon-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }
 
 .px-icon-button svg {
@@ -180,9 +185,14 @@
   position: relative;
   overflow: hidden;
   width: 100%;
-  height: 0.6rem;
+  /* was 0.6rem (9.6px) -- ~60% thicker than Radix's computed 6px
+     (docs/ui-fidelity-report.md). */
+  height: 0.375rem;
   border-radius: 999px;
-  background: var(--panel);
+  /* was a solid var(--panel) fill, reading as a solid pill rather than
+     a subtle track; Radix's computed track is a barely-there
+     translucent white wash (rgba(221, 234, 248, 0.08)). */
+  background: rgba(221, 234, 248, 0.08);
   border: 1px solid var(--border);
 }
 
@@ -415,13 +425,19 @@ px-toggle {
 
 .px-toggle:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }
 
 .px-toggle[data-state="on"] {
   background: var(--accent);
   border-color: var(--accent);
-  color: #0f1115;
+  /* was #0f1115 -- fails contrast on the new saturated indigo accent. */
+  color: var(--accent-contrast);
+}
+
+.px-toggle[data-state="on"]:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .px-toggle:disabled,
@@ -470,15 +486,25 @@ px-toggle {
   position: relative;
   display: inline-grid;
   place-items: center;
-  width: 3rem;
-  height: 3rem;
+  /* was 3rem (48px) -- ~20% larger than Radix Themes' default 40px. */
+  width: 2.5rem;
+  height: 2.5rem;
   overflow: hidden;
-  border-radius: 999px;
+  /* was a hardcoded 999px (full circle) on every avatar. Radix Themes'
+     *default* avatar radius is a soft rounded square (6px, radius=
+     "medium"); full-circle is opt-in (radius="full"). Default to the
+     rounded-square here; [data-radius="full"] below opts back into a
+     circle -- see prolog/ui/avatar.pl's take_radius/3. */
+  border-radius: 0.375rem;   /* 6px */
   background: var(--panel);
   border: 1px solid var(--border);
   flex-shrink: 0;
   user-select: none;
   vertical-align: middle;
+}
+
+.px-avatar[data-radius="full"] {
+  border-radius: 999px;
 }
 
 .px-avatar-image,
@@ -568,8 +594,10 @@ px-switch {
   position: relative;
   display: inline-flex;
   align-items: center;
-  width: 2.5rem;
-  height: 1.4rem;
+  /* was 2.5rem x 1.4rem (40 x 22.4px) -- ~15-25% oversized vs. Radix's
+     computed 35 x 18px (docs/ui-fidelity-report.md). */
+  width: 2.1875rem;   /* 35px */
+  height: 1.25rem;    /* 20px */
   padding: 0;
   border-radius: 999px;
   background: var(--panel);
@@ -583,9 +611,14 @@ px-switch {
   border-color: var(--accent);
 }
 
+.px-switch[data-state="checked"]:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
 .px-switch:has(.px-switch-trigger:focus-visible) {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }
 
 .px-switch[data-disabled] {
@@ -606,9 +639,11 @@ px-switch {
 .px-switch-thumb {
   position: absolute;
   top: 50%;
-  left: 0.15rem;
-  width: 1.1rem;
-  height: 1.1rem;
+  /* Proportional to the trimmed 35x20px track above: 16px thumb, 2px
+     inset each side, 15px travel distance when checked. */
+  left: 0.125rem;    /* 2px */
+  width: 1rem;       /* 16px */
+  height: 1rem;      /* 16px */
   border-radius: 999px;
   background: var(--text);
   transform: translate(0, -50%);
@@ -617,7 +652,7 @@ px-switch {
 }
 
 .px-switch-thumb[data-state="checked"] {
-  transform: translate(1.1rem, -50%);
+  transform: translate(0.9375rem, -50%);   /* 15px */
 }
 
 /* Demo layout (px_ui:demo(switch, ...), /ui/switch). */
@@ -814,7 +849,7 @@ px-checkbox {
 
 .px-checkbox-input:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }
 
 .px-checkbox-input:disabled,
@@ -840,15 +875,16 @@ px-checkbox {
 .px-checkbox-indicator[data-state="checked"]::after {
   width: 0.6rem;
   height: 0.32rem;
-  border-left: 2px solid #0f1115;
-  border-bottom: 2px solid #0f1115;
+  /* was #0f1115 -- fails contrast on the new saturated indigo accent. */
+  border-left: 2px solid var(--accent-contrast);
+  border-bottom: 2px solid var(--accent-contrast);
   transform: rotate(-45deg) translate(1px, -2px);
 }
 
 .px-checkbox-indicator[data-state="indeterminate"]::after {
   width: 0.6rem;
   height: 2px;
-  background: #0f1115;
+  background: var(--accent-contrast);
 }
 
 /* Demo layout (px_ui:demo(checkbox, ...), /ui/checkbox). */
@@ -947,7 +983,7 @@ px-toggle-group {
 }
 
 .px-toggle-group-item:hover:not(:disabled) {
-  background: rgba(125, 211, 252, 0.12);
+  background: rgba(62, 99, 221, 0.12);
 }
 
 .px-toggle-group-item:focus-visible {
@@ -959,7 +995,12 @@ px-toggle-group {
 
 .px-toggle-group-item[data-state="on"] {
   background: var(--accent);
-  color: #0f1115;
+  /* was #0f1115 -- fails contrast on the new saturated indigo accent. */
+  color: var(--accent-contrast);
+}
+
+.px-toggle-group-item[data-state="on"]:hover:not(:disabled) {
+  background: var(--accent-hover);
 }
 
 .px-toggle-group-item:disabled,
@@ -1187,7 +1228,7 @@ px-toolbar {
 }
 
 .px-toolbar-item:hover:not(:disabled) {
-  background: rgba(125, 211, 252, 0.12);
+  background: rgba(62, 99, 221, 0.12);
 }
 
 .px-toolbar-item:focus-visible {
@@ -1418,7 +1459,7 @@ px-popover {
 
 .px-popover-trigger:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }
 
 .px-popover-trigger[data-state="open"] {
@@ -1486,7 +1527,7 @@ px-popover {
 
 .px-popover-close:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }
 
 /* Arrow: a plain rotated square, positioned at the panel's edge facing
@@ -1600,7 +1641,7 @@ px-dialog,
 
 .px-dialog-trigger:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }
 
 .px-dialog-trigger[data-state="open"] {
@@ -1698,9 +1739,16 @@ px-dialog,
   border: none;
   border-radius: 6px;
   background: var(--accent);
-  color: var(--bg);
+  /* was var(--bg) (near-black) -- fails contrast on the new saturated
+     indigo accent; --accent-contrast is white. */
+  color: var(--accent-contrast);
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.px-dialog-save:hover {
+  background: var(--accent-hover);
 }
 
 /* Demo layout (px_ui:demo(dialog, ...), /ui/dialog). */

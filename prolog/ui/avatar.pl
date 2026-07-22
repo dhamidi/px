@@ -69,6 +69,13 @@ Options (a plain list, adr/0026 rule 1):
                      default `loading` (a caller with server-side
                      knowledge -- e.g. a previously-verified image URL
                      -- may start at `loaded` directly).
+                     radius(square|full)  -> data-radius="square"/"full",
+                     default `square` (a soft rounded-square, 6px in
+                     assets/css/ui.css -- Radix Themes' own default
+                     avatar radius). `full` opts into the classic
+                     circle, matching upstream's `radius="full"` prop
+                     (docs/ui-fidelity-report.md's avatar B-grade
+                     finding: this port used to hardcode circle-only).
                      class(C)   merged with "px-avatar", default first.
                      anything else (id(...), data_*(...), ...) passed
                      through verbatim, appended after computed
@@ -141,6 +148,26 @@ take_delay_ms(Opts0, DelayAttrs, Rest) :-
     ;   Rest = Opts0, DelayAttrs = []
     ).
 
+%!  take_radius(+Opts0, -Radius, -Rest) is det.
+%
+%   Radius = the value of radius(R) in Opts0 when R is one of
+%   square/full, else `square` (this port's default -- a soft
+%   rounded-square, matching Radix Themes' own default avatar radius;
+%   see docs/ui-fidelity-report.md's avatar B-grade finding, which
+%   flagged this library's PRIOR always-999px/circle-only default as a
+%   deviation from upstream). `full` opts back into a circle -- the
+%   same choice upstream's `radius="full"` prop makes, e.g. on its
+%   Popover demo avatar. Rest is Opts0 minus any radius(_) term.
+take_radius(Opts0, Radius, Rest) :-
+    (   selectchk(radius(R), Opts0, Rest0),
+        valid_radius(R)
+    ->  Radius = R, Rest = Rest0
+    ;   Rest = Opts0, Radius = square
+    ).
+
+valid_radius(square).
+valid_radius(full).
+
                  /*******************************
                  *             PARTS            *
                  *******************************/
@@ -164,8 +191,9 @@ px_template:render_helper(avatar_root(Opts, Children), S) :-
 
 avatar_root_attrs(Opts0, Attrs) :-
     take_state(Opts0, State, Opts1),
-    merge_class(Opts1, "px-avatar", ClassVal, Opts2),
-    Attrs = [class(ClassVal), data_state(State) | Opts2].
+    take_radius(Opts1, Radius, Opts2),
+    merge_class(Opts2, "px-avatar", ClassVal, Opts3),
+    Attrs = [class(ClassVal), data_state(State), data_radius(Radius) | Opts3].
 
 %!  avatar_image(+Opts) is det.
 %
@@ -258,6 +286,14 @@ avatar_demo ~>
                    [delay_ms(600)],
                    "DL"),
             p("Broken src + delay_ms(600) -- the \"DL\" fallback is held hidden for 600ms after connecting (data-delay-ms=\"600\" on the span) before being allowed to show, same as Radix's Fallback delayMs prop.")
+          ]),
+        div(class("px-avatar-demo-row"),
+          [ avatar([id("avatar-demo-circle"), radius(full)],
+                   [src("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAEElEQVR4nGOI6rkDRwzEcQDTchwhUih1FwAAAABJRU5ErkJggg=="),
+                    alt("Grace Hopper")],
+                   [],
+                   "GH"),
+            p("radius(full) -- the default radius is a soft rounded square (data-radius=\"square\", 6px); this instance opts into the classic full circle (data-radius=\"full\"), matching upstream's radius=\"full\" prop (docs/ui-fidelity-report.md).")
           ]),
         div(class("px-avatar-demo-row"),
           [ avatar_root([id("avatar-demo-fallback-only")],
