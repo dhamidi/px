@@ -263,6 +263,119 @@
 }
 
 /* ---------------------------------------------------------------- */
+/* Collapsible (adr/0026). NATIVE-backed: Root renders `<details>`,   */
+/* Trigger `<summary>`, Content the plain div living after it -- see  */
+/* prolog/ui/collapsible.pl's module header for the full DOM/ARIA     */
+/* contract and its documented gaps (no smooth open/close animation,  */
+/* no post-toggle attribute resync -- `[data-state]`/`aria-expanded`  */
+/* are computed once, server-side, and do NOT follow a native click). */
+/* Because of that gap, the one interactive affordance below that     */
+/* MUST track true live state -- the trigger's chevron rotation -- is */
+/* keyed off the platform's own `[open]` attribute on `<details>`     */
+/* (which the browser really does flip on toggle), not `[data-state]` */
+/* (which the browser never touches). Everything else keys off        */
+/* `[data-state]`, same styling API Radix's ecosystem already knows.  */
+/* ---------------------------------------------------------------- */
+
+.px-collapsible {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.px-collapsible + .px-collapsible {
+  margin-top: 0.75rem;
+}
+
+.px-collapsible-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;   /* drop the browser's default disclosure triangle */
+  user-select: none;
+}
+
+.px-collapsible-trigger::-webkit-details-marker {
+  display: none;      /* Safari/Chrome's own default marker, not ::marker */
+}
+
+.px-collapsible-trigger::marker {
+  content: "";
+}
+
+.px-collapsible-trigger:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.px-collapsible-trigger:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* Custom chevron affordance, in place of the dropped native marker --
+   rotated via the live `[open]` attribute (see the section header
+   above for why not `[data-state]`). */
+.px-collapsible-trigger::after {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.px-collapsible[open] > .px-collapsible-trigger::after {
+  transform: rotate(45deg);
+}
+
+.px-collapsible-content {
+  padding: 0 1rem 1rem;
+  color: var(--muted);
+}
+
+.px-collapsible-content > :last-child {
+  margin-bottom: 0;
+}
+
+/* Disabled: this port's JS-free mitigation (prolog/ui/collapsible.pl's
+   module header) pairs `data-disabled` with `pointer-events: none`
+   (blocks pointer activation) and a `tabindex="-1"` the Prolog side
+   already emits on the trigger (blocks keyboard focus/activation) --
+   between the two, disabled is fully inert with zero JS. */
+.px-collapsible-trigger[data-disabled],
+.px-collapsible-content[data-disabled] {
+  opacity: 0.5;
+}
+
+.px-collapsible-trigger[data-disabled] {
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+/* Demo layout (px_ui:demo(collapsible, ...), /ui/collapsible). */
+
+.px-collapsible-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 32rem;
+}
+
+.px-collapsible-demo .ui-demo-block > p {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.35rem 0 0.75rem;
+}
+
+/* ---------------------------------------------------------------- */
 /* Toggle (adr/0026). NATIVE-capable: `<button type="button"          */
 /* aria-pressed data-state="on|off">` carries the whole contract on   */
 /* every server render -- see prolog/ui/toggle.pl's module header.    */
