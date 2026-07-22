@@ -24,3 +24,8 @@ import "components/checkbox";
 // of aria-pressed/aria-checked/data-state (type=single also enforces
 // radio-like exclusivity across siblings).
 import "components/toggle_group";
+// <px-tabs> is ui/tabs.pl's (adr/0026): the library's second
+// roving-focus consumer -- arrow-key/Home/End navigation across
+// Triggers, plus automatic (focus-driven) activation switching
+// aria-selected/data-state/hidden across Triggers/Content.
+import "components/tabs";

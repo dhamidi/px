@@ -993,3 +993,144 @@ px-toggle-group {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Tabs (adr/0026). CUSTOM-ELEMENT: this library's second roving-     */
+/* focus consumer (assets/js/lib/roving-focus.js) -- see              */
+/* prolog/ui/tabs.pl's module header for the full contract. Root       */
+/* (`.px-tabs`) lays List above Content by default, side-by-side once  */
+/* `[data-orientation="vertical"]` flips it (List becomes a left rail).*/
+/* List (`.px-tabs-list[role="tablist"]`) is an underline-style strip: */
+/* each Trigger's own bottom border is transparent until              */
+/* `[data-state="active"]` swaps it for `var(--accent)` -- the exact   */
+/* `[data-state=...]` styling hook Radix's own ecosystem CSS expects.  */
+/* ---------------------------------------------------------------- */
+
+px-tabs {
+  display: block;
+}
+
+.px-tabs {
+  display: flex;
+  flex-direction: column;
+}
+
+.px-tabs[data-orientation="vertical"] {
+  flex-direction: row;
+  gap: 1.5rem;
+}
+
+.px-tabs-list {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.px-tabs[data-orientation="vertical"] > .px-tabs-list {
+  flex-direction: column;
+  border-bottom: none;
+  border-right: 1px solid var(--border);
+  min-width: 10rem;
+}
+
+.px-tabs-trigger {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.px-tabs[data-orientation="vertical"] > .px-tabs-list .px-tabs-trigger {
+  margin-bottom: 0;
+  margin-right: -1px;
+  border-bottom: none;
+  border-right: 2px solid transparent;
+  justify-content: flex-start;
+}
+
+.px-tabs-trigger:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.px-tabs-trigger:focus-visible {
+  outline: none;
+  position: relative;
+  z-index: 1;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.px-tabs-trigger[data-state="active"] {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.px-tabs-trigger:disabled,
+.px-tabs-trigger[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.px-tabs-content {
+  padding: 1rem 0;
+  color: var(--text);
+}
+
+.px-tabs[data-orientation="vertical"] > .px-tabs-content {
+  padding: 0.25rem 0;
+  flex: 1;
+}
+
+.px-tabs-content:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+  border-radius: 4px;
+}
+
+.px-tabs-content[hidden] {
+  display: none;
+}
+
+.px-tabs-content p {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.px-tabs-content h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+/* Demo layout (px_ui:demo(tabs, ...), /ui/tabs). */
+
+.px-tabs-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 32rem;
+}
+
+.px-tabs-demo h3 {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-tabs-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-tabs-demo p {
+  margin: 0 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
