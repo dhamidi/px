@@ -2,10 +2,11 @@
 %%
 %% The same ADR browser as v1 -- list adr/*.md at "/", render one as
 %% HTML at "/adr/:id" through the framework's own markdown engine,
-%% serve the stylesheet and vendored turbo.js -- rewritten on the
-%% Rails layer, plus a sqlite-backed guestbook (/comments) proving the
-%% full stack: resources routing, forms with validation and 422
-%% re-render, the query builder, and Turbo streams/frames.
+%% serve the stylesheet and vendored turbo.js through the content-hashed
+%% asset pipeline (adr/0025) -- rewritten on the Rails layer, plus a
+%% sqlite-backed guestbook (/comments) proving the full stack: resources
+%% routing, forms with validation and 422 re-render, the query builder,
+%% and Turbo streams/frames.
 %%
 %% Everything below is north-star syntax: `~>` templates, env-relation
 %% handlers, path-helper terms, respond/redirect -- no format-string
@@ -15,24 +16,24 @@
    atomic_list_concat([Here, '/../prolog/prologex'], PrologexLib),
    use_module(PrologexLib).
 
-%% Where the ADRs and static assets live, resolved once at load time.
+%% Where the ADRs live, resolved once at load time.
 
-:- dynamic adr_dir/1, static_dir/1.
+:- dynamic adr_dir/1.
 
 :- prolog_load_context(directory, Here),
    atomic_list_concat([Here, '/../adr'], AdrRel),
    absolute_file_name(AdrRel, AdrDir, [file_type(directory)]),
-   assertz(adr_dir(AdrDir)),
-   atomic_list_concat([Here, '/static'], StaticRel),
-   absolute_file_name(StaticRel, StaticDir, [file_type(directory)]),
-   assertz(static_dir(StaticDir)).
+   assertz(adr_dir(AdrDir)).
 
-%% Routes (adr/0018).
+%% Routes (adr/0018). "/assets/:file" is the asset pipeline (adr/0025):
+%% serve_asset/2 is px_assets:serve_asset/2, reexported by the prologex
+%% facade and therefore already imported into this module by
+%% `use_module(PrologexLib)` above -- no local wrapper needed, same as
+%% respond/3 or row/2.
 
 :- route(get, "/", home_page).
 :- route(get, "/adr/:id", adr_show).
-:- route(get, "/static/style.css", static_css).
-:- route(get, "/static/turbo.js", static_js).
+:- route(get, "/assets/:file", serve_asset).
 :- resources(comments, [only([index, create])]).
 
 %% Guestbook schema: rides with the app, applied once per worker
@@ -64,16 +65,6 @@ adr_show(Env0, Env) :-
     ;   not_found(Env0, Env)
     ).
 
-static_css(Env0, Env) :-
-    static_file('style.css', Text),
-    respond(Env0, raw(Text),
-            [header("content-type", "text/css; charset=utf-8")], Env).
-
-static_js(Env0, Env) :-
-    static_file('turbo.js', Text),
-    respond(Env0, raw(Text),
-            [header("content-type", "text/javascript; charset=utf-8")], Env).
-
 index(Env0, Env) :-
     all_comments(Comments),
     respond(Env0, comments_view(Comments, _{}, []), Env).
@@ -99,8 +90,8 @@ layout(Title, Content) ~>
         [ head(
             [ meta(charset("utf-8")),
               title(Title),
-              link([rel(stylesheet), href("/static/style.css")]),
-              script(src("/static/turbo.js"), [])
+              stylesheet_tag("css/app.css"),
+              \javascript_importmap_tags
             ]),
           body(div(class(page), Content))
         ])
@@ -158,12 +149,20 @@ adr_markdown(Slug, Markdown) :-
     format(atom(Path), '~w/~w.md', [Dir, SlugAtom]),
     read_file_to_string(Path, Markdown, []).
 
-static_file(Name, Text) :-
-    static_dir(Dir),
-    format(atom(Path), '~w/~w', [Dir, Name]),
-    read_file_to_string(Path, Text, []).
-
 all_comments(Comments) :-
     findall(C, row(q(comments, [order_by(desc(id))]), C), Comments).
 
+%% px_ui kitchen-sink (adr/0026).
+
+:- prolog_load_context(directory, Here3),
+   atomic_list_concat([Here3, '/../prolog/px_ui'], PxUiLib),
+   use_module(PxUiLib).
+
+:- route(get, "/ui", ui_index).
+:- route(get, "/ui/:name", ui_show).
+
+ui_index(Env0, Env) :- px_ui:ui_index(Env0, Env).
+ui_show(Env0, Env)  :- px_ui:ui_show(Env0, Env).
+
 :- initialization(prologex_run).
+

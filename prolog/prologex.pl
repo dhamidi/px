@@ -34,8 +34,11 @@ global term_expansion. On top of that it provides:
         The entry point of the north-star example's
         `:- initialization(prologex_run)`: load config/app.pl (cwd
         relative; deploy/run.sh cds to the repo root), install the
-        default pipeline when the app declared none, ensure the
-        database directory exists, start the workers, block forever.
+        default pipeline when the app declared none, compile the
+        asset pipeline (px_assets:compile_assets/0, adr/0025 --
+        idempotent and cheap, so it is safe to run on every start),
+        ensure the database directory exists, start the workers,
+        block forever.
 
 Default pipeline (when the app has no `:- pipeline(...)`):
 
@@ -67,6 +70,7 @@ statements, and installs the connection via px_query:use_db/1
    atomic_list_concat([Dir, '/px_config'],   ConfigSpec),
    atomic_list_concat([Dir, '/px_template'], TemplateSpec),
    atomic_list_concat([Dir, '/px_router'],   RouterSpec),
+   atomic_list_concat([Dir, '/px_assets'],   AssetsSpec),
    atomic_list_concat([Dir, '/px_db'],       DbSpec),
    atomic_list_concat([Dir, '/worker'],      WorkerSpec),
    atomic_list_concat([Dir, '/http_stream'], StreamSpec),
@@ -76,6 +80,7 @@ statements, and installs the connection via px_query:use_db/1
    reexport(TurboSpec,    [turbo_or_redirect/4, turbo_stream/3, dom_id/2]),
    reexport(ConfigSpec,   [config/2, require_config/2]),
    reexport(TemplateSpec, [render_to_string/2]),
+   reexport(AssetsSpec,   [asset_path/2, serve_asset/2]),
    use_module(RouterSpec, []),         % directives are global term_expansion
    use_module(DbSpec,     []),
    use_module(WorkerSpec, []),
@@ -140,6 +145,7 @@ add_schema(SQL) :-
 prologex_run :-
     load_app_config,
     ensure_pipeline,
+    px_assets:compile_assets,
     app_port(Port),
     app_workers(Workers),
     database_path(DBPath),

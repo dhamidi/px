@@ -283,6 +283,19 @@ handle_request(V1Request, Stream, WorkerId) :-
 %   Content-Type defaults to text/html; charset=utf-8 unless a
 %   header set it. Bodies render via px_template:render/2 (adr/0019),
 %   streaming the term straight to Stream; `none` writes nothing.
+%
+%   `raw_bytes(Binary)` is a second escape door, alongside px_template's
+%   raw/1, for a body that is genuinely binary (gzip-compressed asset
+%   bytes, images, ...) rather than text (adr/0025's asset pipeline is
+%   the first caller). Binary MUST be a string produced by
+%   read_file_to_string/3 with encoding(iso_latin_1) -- an isomorphic
+%   byte<->code mapping -- because the connection stream defaults to
+%   UTF-8 (c/http_stream_swi.c): writing such a string on a UTF-8
+%   stream would re-encode every code point above 127 into a multi-byte
+%   UTF-8 sequence and corrupt the bytes. set_stream/2 switches this
+%   one-shot response stream (adr/0012: one request per connection,
+%   closed right after) to octet encoding first, so the codes go out
+%   one byte each, unchanged.
 write_response(Stream, Env) :-
     get_dict(response, Env, Response),
     get_dict(status, Response, Status),
@@ -301,6 +314,9 @@ write_response(Stream, Env) :-
     format(Stream, "connection: close\r\n\r\n", []),
     (   Body == none
     ->  true
+    ;   Body = raw_bytes(Binary)
+    ->  set_stream(Stream, encoding(octet)),
+        write(Stream, Binary)
     ;   px_template:render(Stream, Body)
     ),
     flush_output(Stream).
