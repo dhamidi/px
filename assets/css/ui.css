@@ -1803,3 +1803,96 @@ px-dialog,
   outline: none;
   border-color: var(--accent);
 }
+
+/* ---------------------------------------------------------------- */
+/* Alert Dialog (adr/0026). A thin config wrapper over Dialog -- see  */
+/* prolog/ui/alert_dialog.pl's module header for the full contract.   */
+/* Root/Trigger/Content/Title/Description are literally the Dialog    */
+/* parts (same classes: px-dialog, px-dialog-trigger, px-dialog-      */
+/* content, px-dialog-title, px-dialog-description -- every rule      */
+/* above this section already covers them, nothing to add here).      */
+/* Action and Cancel compose dialog_close/2 (same .px-dialog-close    */
+/* base as Dialog's icon "x" close button), so the two rules below    */
+/* first UNDO that button's absolute icon-corner positioning before   */
+/* laying Action/Cancel out as normal inline footer buttons.          */
+/* ---------------------------------------------------------------- */
+
+.px-alert-dialog-action,
+.px-alert-dialog-cancel {
+  position: static;
+  top: auto;
+  right: auto;
+  width: auto;
+  height: auto;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: normal;
+  cursor: pointer;
+}
+
+/* Cancel: neutral, matches .px-dialog-trigger's own panel/border
+   treatment -- the least-destructive action should look ordinary, not
+   draw the eye away from Action. */
+.px-alert-dialog-cancel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.px-alert-dialog-cancel:hover {
+  border-color: var(--accent);
+}
+
+.px-alert-dialog-cancel:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+}
+
+/* Action: destructive red, per Radix's own hero demo ("Yes, delete
+   account") -- --danger for the fill, --accent-contrast for on-fill
+   text (same contrast-safe pairing .px-dialog-save uses for --accent). */
+.px-alert-dialog-action {
+  border: none;
+  background: var(--danger);
+  color: var(--accent-contrast);
+}
+
+.px-alert-dialog-action:hover {
+  background: #f65a5a;
+}
+
+.px-alert-dialog-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.45);
+}
+
+/* Demo layout (px_ui:demo(alert_dialog, ...), /ui/alert_dialog). */
+
+.px-alert-dialog-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 32rem;
+}
+
+.px-alert-dialog-demo h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-alert-dialog-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-alert-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}

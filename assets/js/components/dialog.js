@@ -34,17 +34,27 @@
 //      resolves into a `close()` call; this element only listens for
 //      the resulting `close` event (step 4) to do its own sync work,
 //      same as every other close path.
-//   3. Outside click (modal only): a `click` listener on the <dialog>
-//      element itself. A click that lands in the ::backdrop area
-//      dispatches with `event.target === dialogEl` (nothing inside the
-//      dialog's content box absorbed it); a click on the dialog's own
-//      padding/background *inside* its rendered box ALSO sets
-//      target===dialogEl, so `target===dialogEl` alone is not enough --
-//      a `getBoundingClientRect()` bounds check on the pointer
+//   3. Outside click (modal AND not opted out, see data-no-outside-dismiss
+//      below): a `click` listener on the <dialog> element itself. A
+//      click that lands in the ::backdrop area dispatches with
+//      `event.target === dialogEl` (nothing inside the dialog's content
+//      box absorbed it); a click on the dialog's own padding/background
+//      *inside* its rendered box ALSO sets target===dialogEl, so
+//      `target===dialogEl` alone is not enough -- a
+//      `getBoundingClientRect()` bounds check on the pointer
 //      coordinates disambiguates "outside the box" (close) from
 //      "inside the box, on bare background" (do nothing), exactly the
 //      analysis doc's own "event.target === dialogEl with a bounds
 //      check" phrasing.
+//
+//      `data-no-outside-dismiss` (prolog/ui/alert_dialog.pl's opt-out,
+//      adr/0026): when present on the <dialog> element, this listener
+//      is never attached at all -- Alert Dialog's defining behavior is
+//      that outside click must NOT dismiss it (the ARIA alertdialog
+//      pattern: only an explicit action closes it; Escape still does,
+//      unaffected by this flag, since the `cancel`/`close` event path
+//      below is not gated on it). Backward-compatible: absent (every
+//      existing Dialog) behaves exactly as before.
 //   4. `close` event (fired for EVERY dialog-closing path: Escape,
 //      backdrop click, a data-dialog-close button, or a form
 //      method="dialog" submission) -> data-state="closed" on Content,
@@ -92,6 +102,7 @@ class PxDialog extends HTMLElement {
     if (!this._dialog) return;
 
     this._modal = this._dialog.getAttribute("data-modal") !== "false";
+    this._noOutsideDismiss = this._dialog.hasAttribute("data-no-outside-dismiss");
     this._savedOverflow = null;
 
     this._onTriggerClick = this._onTriggerClick.bind(this);
@@ -105,7 +116,7 @@ class PxDialog extends HTMLElement {
     // than once, or be added dynamically inside caller-supplied body
     // content) rather than binding one listener per button.
     this._dialog.addEventListener("click", this._onCloseButtonClick.bind(this));
-    if (this._modal) {
+    if (this._modal && !this._noOutsideDismiss) {
       this._dialog.addEventListener("click", this._onDialogClick);
     }
     this._dialog.addEventListener("close", this._onClose);
