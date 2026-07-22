@@ -142,3 +142,13 @@ import "components/menubar";
 // (from-start/from-end/to-start/to-end) from comparing trigger list
 // order on every switch.
 import "components/navigation_menu";
+// <px-slider> is ui/slider.pl's (adr/0026): NATIVE single-thumb --
+// the real, styled `<input type=range>` already drags, keys and
+// submits with zero JS (it IS the visible thumb; see that module's
+// Prolog header for why Thumb collapses into it rather than a
+// decorated sibling the way components/switch.js's control does).
+// This element's only job is keeping the decorative `.px-slider-range`
+// accent fill's `--slider-value` CSS custom property live off the
+// input's native `input` event while dragging/keying, since nothing
+// re-runs server-side markup mid-drag.
+import "components/slider";

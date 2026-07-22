@@ -3021,3 +3021,206 @@ px-navigation-menu {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Slider (adr/0026). NATIVE (single-thumb): the real control is a    */
+/* native `<input type="range">` (`.px-slider-thumb`) styled directly */
+/* via `::-webkit-slider-thumb`/`::-moz-range-thumb` -- see            */
+/* prolog/ui/slider.pl's module header for the full contract and why  */
+/* Thumb collapses into that one element rather than switch.pl's       */
+/* "hide the real control, decorate a sibling" technique. Track        */
+/* (`.px-slider-track`, purely decorative rail) and Range               */
+/* (`.px-slider-range`, the accent fill) are both driven off the       */
+/* `--slider-value` custom property Root writes -- server-side at      */
+/* render time, kept live client-side by `<px-slider>`                */
+/* (assets/js/components/slider.js) on every native `input` event      */
+/* while dragging/keying. The native input is layered exactly over     */
+/* Track/Range (same absolute box), so the browser's own thumb-        */
+/* position math and this CSS var agree automatically -- no JS         */
+/* position math anywhere.                                             */
+/* ---------------------------------------------------------------- */
+
+px-slider {
+  display: inline-block;
+  width: 100%;
+  max-width: 14rem;
+}
+
+.px-slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 1.25rem;   /* 20px -- the full drag/click hit area */
+  touch-action: none;
+}
+
+.px-slider[data-orientation="vertical"] {
+  flex-direction: column;
+  width: 1.25rem;
+  height: 10rem;   /* 160px */
+}
+
+.px-slider[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.px-slider-track {
+  position: absolute;
+  border-radius: 999px;
+  /* same barely-there translucent wash as progress.pl's track. */
+  background: rgba(221, 234, 248, 0.08);
+  border: 1px solid var(--border);
+}
+
+.px-slider[data-orientation="horizontal"] .px-slider-track {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 0.25rem;   /* 4px */
+  transform: translateY(-50%);
+}
+
+.px-slider[data-orientation="vertical"] .px-slider-track {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 0.25rem;   /* 4px */
+  transform: translateX(-50%);
+}
+
+.px-slider-range {
+  position: absolute;
+  background: var(--accent);
+  border-radius: inherit;
+}
+
+.px-slider[data-orientation="horizontal"] .px-slider-range {
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: calc(var(--slider-value, 0) * 1%);
+}
+
+.px-slider[data-orientation="vertical"] .px-slider-range {
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(var(--slider-value, 0) * 1%);
+}
+
+.px-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.px-slider[data-orientation="vertical"] .px-slider-thumb {
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+.px-slider-thumb:disabled,
+.px-slider-thumb[data-disabled] {
+  cursor: not-allowed;
+}
+
+/* Hide the native runnable track entirely -- the decorative Track/
+   Range pair above already paints it; only the thumb itself should
+   ever come from the real input. */
+
+.px-slider-thumb::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 100%;
+}
+
+.px-slider-thumb::-moz-range-track {
+  background: transparent;
+  height: 100%;
+  border: none;
+}
+
+.px-slider-thumb::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1rem;     /* 16px */
+  height: 1rem;    /* 16px */
+  border-radius: 999px;
+  background: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+  /* centers the 16px thumb within the 20px-tall track box -- webkit
+     does not auto-center a styled thumb the way Firefox does. */
+  margin-top: 0.125rem;
+}
+
+.px-slider-thumb::-moz-range-thumb {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--text);
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+}
+
+/* Firefox draws its own dotted focus outline around the thumb on top
+   of the box-shadow ring below -- suppress it, same well-known
+   ::-moz-focus-outer trick every custom-thumb range slider needs. */
+.px-slider-thumb::-moz-focus-outer {
+  border: 0;
+}
+
+.px-slider-thumb:focus-visible {
+  outline: none;
+}
+
+.px-slider-thumb:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.px-slider-thumb:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35), 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.px-slider-thumb:disabled::-webkit-slider-thumb,
+.px-slider-thumb[data-disabled]::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+.px-slider-thumb:disabled::-moz-range-thumb,
+.px-slider-thumb[data-disabled]::-moz-range-thumb {
+  cursor: not-allowed;
+}
+
+/* Demo layout (px_ui:demo(slider, ...), /ui/slider). */
+
+.px-slider-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 22rem;
+}
+
+.px-slider-row p {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-slider-row-vertical {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.px-slider-row-vertical px-slider {
+  width: auto;
+}
