@@ -11,3 +11,6 @@ import "components/toggle";
 // <px-avatar> is ui/avatar.pl's (adr/0026): watches its <img> for
 // load/error and reflects the result onto its own data-state attribute.
 import "components/avatar";
+// <px-switch> is ui/switch.pl's (adr/0026): keeps aria-checked/data-state
+// live on click -- the platform already handles the toggle itself.
+import "components/switch";
