@@ -150,7 +150,7 @@ tests :-
 
     check(checked_exact,
           Checked ==
-              "<label class=\"px-radio-group-item\" data-state=\"checked\"><input type=\"radio\" name=\"g\" value=\"v1\" checked><span class=\"px-radio-group-label\">Label1</span></label>"),
+              "<label class=\"px-radio-group-item\" data-state=\"checked\"><input type=\"radio\" name=\"g\" value=\"v1\" class=\"px-radio-group-input\" checked><span class=\"px-radio-group-label\">Label1</span></label>"),
     % No explicit role/aria-checked authored on the input -- the native
     % semantics already give role=radio/aria-checked (module header,
     % deviation 1); confirm neither string appears anywhere.
@@ -158,6 +158,16 @@ tests :-
           not_contains(Checked, "role=")),
     check(checked_no_explicit_aria_checked,
           not_contains(Checked, "aria-checked")),
+    % adr/0026 rule 7(a): the CSS-hook class the input actually needs
+    % (assets/css/ui.css's `.px-radio-group-input` rules -- appearance:
+    % none, custom circle, :checked dot) must be asserted BY NAME on
+    % the native <input> itself, not just implied by a whole-string
+    % snapshot -- a missing class here must fail loudly, the way the
+    % pre-fix version of this file silently didn't (docs/ui-visual-
+    % audit.md).
+    check(checked_input_has_css_hook_class,
+          ( all_attr_values(Checked, "class", ClassValues),
+            memberchk("px-radio-group-input", ClassValues) )),
 
     % ===================================================================
     % Item: unchecked (default) + disabled.
@@ -170,7 +180,7 @@ tests :-
 
     check(unchecked_disabled_exact,
           UncheckedDisabled ==
-              "<label class=\"px-radio-group-item\" data-state=\"unchecked\" data-disabled=\"\"><input type=\"radio\" name=\"g\" value=\"v2\" disabled><span class=\"px-radio-group-label\">Label2</span></label>"),
+              "<label class=\"px-radio-group-item\" data-state=\"unchecked\" data-disabled=\"\"><input type=\"radio\" name=\"g\" value=\"v2\" class=\"px-radio-group-input\" disabled><span class=\"px-radio-group-label\">Label2</span></label>"),
 
     % ===================================================================
     % Item: plain unchecked, no disabled -- data-state default, no
@@ -187,6 +197,11 @@ tests :-
           not_contains(Plain, "data-disabled")),
     check(plain_no_native_disabled,
           not_contains(Plain, "disabled>")),
+    % adr/0026 rule 7(a): CSS-hook class asserted by name, every Item,
+    % not just the one already checked above.
+    check(plain_input_has_css_hook_class,
+          ( all_attr_values(Plain, "class", PlainClassValues),
+            memberchk("px-radio-group-input", PlainClassValues) )),
 
     % ===================================================================
     % Item /1 (no children) -- empty label span.
@@ -195,7 +210,7 @@ tests :-
     render_to_string(radio_group_item([name("g"), value("v4")]), NoLabel),
     check(no_label_exact,
           NoLabel ==
-              "<label class=\"px-radio-group-item\" data-state=\"unchecked\"><input type=\"radio\" name=\"g\" value=\"v4\"><span class=\"px-radio-group-label\"></span></label>"),
+              "<label class=\"px-radio-group-item\" data-state=\"unchecked\"><input type=\"radio\" name=\"g\" value=\"v4\" class=\"px-radio-group-input\"><span class=\"px-radio-group-label\"></span></label>"),
 
     % ===================================================================
     % Item: class merge, pass-through lands on the <input>, not the
@@ -331,6 +346,14 @@ tests :-
           ( contains(Demo, "Default"),
             contains(Demo, "Comfortable"),
             contains(Demo, "Compact (disabled)") )),
+    % adr/0026 rule 7(a): the CSS-hook class asserted by name on the
+    % actual demo end-to-end -- every rendered <input> must carry it,
+    % since this is the exact string assets/css/ui.css's
+    % `.px-radio-group-input` rules (appearance:none, custom circle,
+    % :checked dot) select on. This is the check that would have
+    % caught docs/ui-visual-audit.md's radio_group defect immediately.
+    check(demo_inputs_have_css_hook_class,
+          count_occurrences(Demo, "class=\"px-radio-group-input\"", 3)),
 
     % show some real output for the record
     format("~n--- rendered radio_group_demo ---~n~w~n----------------------------------~n",

@@ -263,8 +263,9 @@ item_attrs(Opts, WrapperAttrs, InputAttrs) :-
     exclude(item_reserved_opt, Opts, Extra),
     append([ [class(ClassVal), data_state(State)], DisWrapAttrs
            ], WrapperAttrs),
-    append([ [type(radio), name(N), value(V)], CheckedAttrs,
-             DisInAttrs, Extra
+    append([ [type(radio), name(N), value(V)],
+             [class("px-radio-group-input")],
+             CheckedAttrs, DisInAttrs, Extra
            ], InputAttrs).
 
 %!  require_opt(+Opts, +Key, +Context, -Value) is det.
