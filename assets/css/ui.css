@@ -2723,3 +2723,301 @@ px-menubar {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Navigation Menu (adr/0026). STANDALONE per docs/radix-port-        */
+/* analysis.md -- no role=menu, no popper, no roving-focus; see       */
+/* prolog/ui/navigation_menu.pl's header for the full anatomy/        */
+/* contract. Root (`.px-navigation-menu`, a pill-shaped horizontal    */
+/* bar by default, a rail once `[data-orientation="vertical"]`) wraps  */
+/* List (`.px-navigation-menu-list`) wraps Items                      */
+/* (`.px-navigation-menu-item`, `position: relative` -- the anchor for */
+/* its own Content, see "Viewport decision" in the Prolog header: no   */
+/* shared portaled viewport here, each Content is positioned by plain  */
+/* CSS relative to its own Item). Trigger's `::after` chevron          */
+/* substitutes for the Indicator this port doesn't ship (same header,  */
+/* same note); Content's directional slide is keyed entirely off       */
+/* `[data-motion]`, written by assets/js/components/navigation_menu.js */
+/* on every open/switch -- see that file's header for the exact        */
+/* from-start/from-end/to-start/to-end algorithm.                     */
+/* ---------------------------------------------------------------- */
+
+px-navigation-menu {
+  display: contents;
+}
+
+.px-navigation-menu {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem;
+}
+
+.px-navigation-menu[data-orientation="vertical"] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 14rem;
+  border-radius: 12px;
+  padding: 0.4rem;
+}
+
+.px-navigation-menu-list {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.px-navigation-menu[data-orientation="vertical"] .px-navigation-menu-list {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.1rem;
+  width: 100%;
+}
+
+.px-navigation-menu-item {
+  position: relative;
+}
+
+.px-navigation-menu[data-orientation="vertical"] .px-navigation-menu-item {
+  width: 100%;
+}
+
+.px-navigation-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.55rem 0.9rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.px-navigation-menu[data-orientation="vertical"] .px-navigation-menu-trigger {
+  width: 100%;
+  justify-content: space-between;
+  border-radius: 8px;
+}
+
+/* Substitutes for the Indicator this port doesn't ship (see the module
+   header) -- a plain CSS chevron, rotated 180deg open, no JS geometry. */
+.px-navigation-menu-trigger::after {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.7;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 0.2s ease;
+}
+
+.px-navigation-menu-trigger[data-state="open"]::after {
+  transform: rotate(225deg) translateY(-1px);
+}
+
+.px-navigation-menu-trigger:hover {
+  background: var(--border);
+}
+
+.px-navigation-menu-trigger[data-state="open"] {
+  background: var(--border);
+  color: var(--text);
+}
+
+.px-navigation-menu-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+}
+
+/* Content: no native `popover` (see the Prolog header's "Platform
+   choice") -- plain `position: absolute` relative to its own
+   `.px-navigation-menu-item`, a wide flyout panel with its own grid of
+   link cards (`.px-navigation-menu-content-grid`), matching the
+   reference's own hero demo shape. `visibility` is delayed on close
+   (transition-delay) so the exit slide/fade -- keyed off `[data-motion]`
+   the same as the entrance -- has time to actually play, without
+   needing `@starting-style`/`allow-discrete` for the exit half. */
+.px-navigation-menu-content {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
+  z-index: 20;
+  width: max-content;
+  max-width: min(34rem, 90vw);
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(0);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0.18s;
+}
+
+.px-navigation-menu[data-orientation="vertical"] .px-navigation-menu-content {
+  position: static;
+  top: auto;
+  left: auto;
+  margin: 0.25rem 0 0.25rem 0.75rem;
+  max-width: none;
+  box-shadow: none;
+  border-color: transparent;
+  background: transparent;
+  padding: 0.25rem 0 0.25rem 0.5rem;
+  border-left: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.px-navigation-menu-content[data-state="open"] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0s linear 0s;
+}
+
+@starting-style {
+  .px-navigation-menu-content[data-state="open"] {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  .px-navigation-menu-content[data-state="open"][data-motion="from-start"] {
+    transform: translateX(-1rem);
+  }
+  .px-navigation-menu-content[data-state="open"][data-motion="from-end"] {
+    transform: translateX(1rem);
+  }
+}
+
+.px-navigation-menu-content[data-state="closed"][data-motion="to-start"] {
+  transform: translateX(-1rem);
+}
+
+.px-navigation-menu-content[data-state="closed"][data-motion="to-end"] {
+  transform: translateX(1rem);
+}
+
+.px-navigation-menu-content-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(11rem, 1fr));
+  gap: 0.35rem;
+}
+
+.px-navigation-menu-content-grid-featured {
+  grid-template-columns: 12rem repeat(1, minmax(11rem, 1fr));
+  grid-template-rows: repeat(3, auto);
+}
+
+.px-navigation-menu-content-grid-featured > .px-navigation-menu-featured {
+  grid-row: 1 / span 3;
+}
+
+.px-navigation-menu-link {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+.px-navigation-menu-link[data-active="true"] {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.px-navigation-menu[data-orientation="vertical"] > .px-navigation-menu-list > .px-navigation-menu-item > .px-navigation-menu-link {
+  padding: 0.5rem 0.75rem;
+}
+
+.px-navigation-menu[data-orientation="vertical"] > .px-navigation-menu-list > .px-navigation-menu-item > .px-navigation-menu-link:hover {
+  background: var(--border);
+}
+
+/* Link cards inside a Content grid -- demo-only scaffolding shape (the
+   reference's own "Introduction / Getting started / Styling..." tiles),
+   same status as e.g. hover_card.pl's `.px-hover-card-profile`. */
+.px-navigation-menu-card {
+  padding: 0.65rem 0.75rem;
+}
+
+.px-navigation-menu-card:hover,
+.px-navigation-menu-card:focus-visible {
+  background: var(--border);
+  outline: none;
+}
+
+.px-navigation-menu-card-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 0.2rem;
+}
+
+.px-navigation-menu-card-desc {
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.px-navigation-menu-featured {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 1rem;
+  border-radius: 8px;
+  background: linear-gradient(160deg, var(--accent), var(--accent-hover));
+  color: var(--accent-contrast);
+}
+
+.px-navigation-menu-featured:hover,
+.px-navigation-menu-featured:focus-visible {
+  background: linear-gradient(160deg, var(--accent-hover), var(--accent));
+  outline: none;
+}
+
+.px-navigation-menu-featured-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.px-navigation-menu-featured-desc {
+  font-size: 0.82rem;
+  line-height: 1.4;
+  opacity: 0.92;
+}
+
+.px-navigation-menu-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  max-width: 44rem;
+}
+
+.px-navigation-menu-demo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-navigation-menu-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}

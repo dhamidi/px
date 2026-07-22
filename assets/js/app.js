@@ -126,3 +126,19 @@ import "components/context_menu";
 // event.defaultPrevented) -- see that file's header for the full
 // mechanism. Neither shared engine is modified for this.
 import "components/menubar";
+// <px-navigation-menu> is ui/navigation_menu.pl's (adr/0026): STANDALONE
+// per docs/radix-port-analysis.md ("benefits from nothing built in
+// phases 8-12... schedule independently") -- imports NEITHER "lib/menu"
+// (no role=menu semantics here at all) NOR "lib/popper" (Content is
+// positioned by plain CSS relative to its own Item, not a shared
+// portaled viewport -- see prolog/ui/navigation_menu.pl's header,
+// "Viewport decision"). This element's own job: a ~200ms hover-open
+// delay that becomes instant when switching directly between two
+// triggers while one is already open (menubar-like), a pointerover-on-
+// panel grace bridge (same precedent as components/hover_card.js),
+// click/Enter open with no delay (native <button> activation), Escape/
+// blur-out/outside-pointerdown dismissal (no native `popover` here --
+// see that module's "Platform choice"), and computing `data-motion`
+// (from-start/from-end/to-start/to-end) from comparing trigger list
+// order on every switch.
+import "components/navigation_menu";
