@@ -2625,7 +2625,6 @@ px-context-menu {
   color: var(--text);
 }
 
-
 /* ---------------------------------------------------------------- */
 /* Menubar (adr/0026): prolog/ui/menubar.pl -- Root bar + Trigger      */
 /* highlight styling only; Menu (`.px-menubar-menu`) is `display:       */
@@ -3023,6 +3022,98 @@ px-navigation-menu {
 }
 
 /* ---------------------------------------------------------------- */
+/* One-Time Password Field (adr/0026). CUSTOM-ELEMENT, hand-rolled    */
+/* keyboard/paste state machine (does NOT reuse lib/roving-focus --   */
+/* see prolog/ui/otp_field.pl's module header for why) -- see that    */
+/* header for the full ARIA/data contract. `.px-otp-field` is a row   */
+/* of square bordered cells (`.px-otp-field-input`); a filled cell    */
+/* (`[data-filled]`, kept live by assets/js/components/otp_field.js)  */
+/* gets a slightly stronger border/background so a completed code     */
+/* reads at a glance; the currently-focused cell gets the family's    */
+/* usual `--accent` focus ring. `.px-otp-field-hidden-input` carries  */
+/* no visual styling (type="hidden" is never painted); its class      */
+/* exists purely as this element's own query hook, matching every     */
+/* other component's `.px-<name>-...` selector convention.            */
+/* ---------------------------------------------------------------- */
+
+px-otp-field {
+  display: inline-block;
+}
+
+.px-otp-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.px-otp-field[data-disabled] {
+  opacity: 0.6;
+}
+
+.px-otp-field-input {
+  width: 2.75rem;
+  height: 3rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.15s ease, background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.px-otp-field-input[data-filled] {
+  border-color: var(--muted);
+  background: var(--bg);
+}
+
+.px-otp-field-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.px-otp-field-input:disabled,
+.px-otp-field-input[data-disabled] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Demo layout (px_ui:demo(otp_field, ...), /ui/otp_field). */
+
+.px-otp-field-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 30rem;
+}
+
+.px-otp-field-demo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-otp-field-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-otp-field-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-otp-field-demo-readout {
+  margin-top: 0.75rem;
+}
+
+/* ---------------------------------------------------------------- */
 /* Slider (adr/0026). NATIVE (single-thumb): the real control is a    */
 /* native `<input type="range">` (`.px-slider-thumb`) styled directly */
 /* via `::-webkit-slider-thumb`/`::-moz-range-thumb` -- see            */
@@ -3223,4 +3314,645 @@ px-slider {
 
 .px-slider-row-vertical px-slider {
   width: auto;
+}
+
+
+/* ---------------------------------------------------------------- */
+/* Scroll Area (adr/0026). PLATFORM-FIRST: the real scrolling AND the */
+/* real visible scrollbar are both native -- Viewport is a plain      */
+/* `overflow: auto` div, recolored/thinned directly via               */
+/* `scrollbar-width`/`scrollbar-color` (Firefox, and Chrome 121+)     */
+/* and `::-webkit-scrollbar*` (Chromium/Safari, which honor the       */
+/* webkit pseudo-elements IN PREFERENCE TO `scrollbar-color` when     */
+/* both are present -- both rule sets are needed for full coverage).  */
+/* The decorative Scrollbar/Thumb/Corner parts prolog/ui/scroll_area  */
+/* .pl renders (`data-orientation`/`data-state`, per docs/radix-port- */
+/* analysis.md's contract) are never painted (`display: none` below)  */
+/* -- their only job is carrying that contract and giving             */
+/* assets/js/components/scroll_area.js something to toggle;           */
+/* `:has()` lets the REAL scrollbar's color key off that same         */
+/* `data-state`, one data source, zero duplicated visual scrollbar.   */
+/* See prolog/ui/scroll_area.pl's module header for the full          */
+/* platform-vs-JS writeup, including what is honestly deferred        */
+/* (thumb pointer-drag, corner sizing -- the native scrollbar already  */
+/* does both with zero code here).                                    */
+/* ---------------------------------------------------------------- */
+
+px-scroll-area {
+  display: contents;
+}
+
+.px-scroll-area {
+  --px-scroll-area-thumb: color-mix(in srgb, var(--accent) 45%, var(--border) 55%);
+  --px-scroll-area-thumb-hover: color-mix(in srgb, var(--accent) 70%, var(--border) 30%);
+  position: relative;
+  display: block;
+  overflow: hidden;
+  /* Fill whatever box the caller gives Root (e.g. .px-scroll-area-demo-box's
+     height: 12rem below) -- without this, Root has no explicit height of
+     its own (block, height: auto), so it just grows to fit its content and
+     nothing ever actually overflows Viewport underneath it. */
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.px-scroll-area-viewport {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  /* Firefox (and Chrome 121+): thin, transparent-track, transparent-
+     thumb by default -- "hidden" until a [data-type]/[data-state] rule
+     below turns the thumb color on. */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+/* Chromium/Safari path -- see the section banner above for why both
+   this and scrollbar-color/-width are shipped together. */
+.px-scroll-area-viewport::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.px-scroll-area-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.px-scroll-area-viewport::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 999px;
+  /* A transparent border + background-clip: content-box insets the
+     painted thumb away from the scrollbar's own edges -- the
+     "floating rounded pill" look Radix's own custom thumb has,
+     achieved here with zero extra markup. */
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* type="always" / type="auto": statically visible, no JS at all (see
+   prolog/ui/scroll_area.pl's module header -- for "auto" this is a
+   documented, narrower gap: the native overflow:auto scrollbar-track
+   machinery already only paints when content genuinely overflows, so
+   the practical "no scrollbar when nothing to scroll" outcome still
+   holds, decided by the platform's layout engine rather than by a
+   ResizeObserver here). */
+.px-scroll-area[data-type="always"] .px-scroll-area-viewport,
+.px-scroll-area[data-type="auto"] .px-scroll-area-viewport {
+  scrollbar-color: var(--px-scroll-area-thumb) transparent;
+}
+
+.px-scroll-area[data-type="always"] .px-scroll-area-viewport::-webkit-scrollbar-thumb,
+.px-scroll-area[data-type="auto"] .px-scroll-area-viewport::-webkit-scrollbar-thumb {
+  background-color: var(--px-scroll-area-thumb);
+}
+
+/* type="hover" / type="scroll": assets/js/components/scroll_area.js
+   toggles data-state=visible|hidden on the decorative (never painted)
+   Scrollbar part(s) -- :has() reaches past it to recolor the REAL
+   scrollbar on Viewport, a sibling-of-a-descendant relationship plain
+   child/sibling combinators can't express. */
+.px-scroll-area:has(.px-scroll-area-scrollbar[data-state="visible"]) .px-scroll-area-viewport {
+  scrollbar-color: var(--px-scroll-area-thumb) transparent;
+}
+
+.px-scroll-area:has(.px-scroll-area-scrollbar[data-state="visible"]) .px-scroll-area-viewport::-webkit-scrollbar-thumb {
+  background-color: var(--px-scroll-area-thumb);
+}
+
+.px-scroll-area-viewport:hover::-webkit-scrollbar-thumb,
+.px-scroll-area-viewport:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--px-scroll-area-thumb-hover);
+}
+
+/* Decorative anatomy (Scrollbar/Thumb/Corner) -- rendered for DOM/
+   data-attribute CONTRACT fidelity only (adr/0026 rule 2), never
+   painted: the real, only visual scrollbar is the native one styled
+   above. See prolog/ui/scroll_area.pl's module header, "What is
+   deferred", for the honest accounting (thumb drag, corner sizing --
+   both already native, zero code needed here). */
+.px-scroll-area-scrollbar,
+.px-scroll-area-thumb,
+.px-scroll-area-corner {
+  display: none;
+}
+
+/* Demo layout (px_ui:demo(scroll_area, ...), /ui/scroll_area). */
+
+.px-scroll-area-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 26rem;
+}
+
+.px-scroll-area-demo h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-scroll-area-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-scroll-area-demo-box {
+  height: 12rem;
+  width: 100%;
+}
+
+.px-scroll-area-horizontal-box {
+  height: auto;
+}
+
+.px-scroll-area-tag-list {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  list-style: none;
+}
+
+.px-scroll-area-tag-list li {
+  padding: 0.45rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.86rem;
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+  color: var(--text);
+}
+
+.px-scroll-area-tag-list li:last-child {
+  border-bottom: none;
+}
+
+.px-scroll-area-chip-row {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  width: max-content;
+}
+
+.px-scroll-area-chip {
+  flex: 0 0 auto;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* orientation(both) demo content: a column of nowrap chips -- naturally
+   taller AND (via width: max-content) wider than its box, forcing both
+   Scrollbars + the Corner to have somewhere real to render. */
+.px-scroll-area-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem;
+  width: max-content;
+}
+
+
+/* ---------------------------------------------------------------- */
+/* Password Toggle Field (adr/0026). CUSTOM-ELEMENT, narrow scope --  */
+/* see prolog/ui/password_toggle_field.pl's module header for the     */
+/* full contract and its three documented deviations from upstream    */
+/* (Root as a real wrapping <div>, the Toggle's accessible name coming */
+/* from accessible_icon's hidden-text span rather than aria-label, and */
+/* the additive `data-visible` CSS hook). Input and Toggle are         */
+/* composed into ONE bordered field (`.px-password-toggle-field`,     */
+/* this port's Root) -- the focus ring lives on the wrapper via        */
+/* `:focus-within` so it wraps around both the text and the button,   */
+/* not just whichever one currently has focus. The eye/eye-off icon   */
+/* pair are both always in the DOM; exactly one is shown at a time,   */
+/* purely off the Toggle's own `[data-visible]` attribute --           */
+/* `<px-password-toggle-field>` (assets/js/components/                */
+/* password_toggle_field.js) is what flips it, alongside the input's  */
+/* actual `type` and the hidden accessible-name text, on every click. */
+/* ---------------------------------------------------------------- */
+
+px-password-toggle-field {
+  display: inline-block;
+}
+
+.px-password-toggle-field {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.px-password-toggle-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+}
+
+.px-password-toggle-field-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.95rem;
+  padding: 0.55rem 0.7rem;
+  outline: none;
+}
+
+.px-password-toggle-field-input::placeholder {
+  color: var(--muted);
+}
+
+.px-password-toggle-field-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.px-password-toggle-field-toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.px-password-toggle-field-toggle:hover {
+  color: var(--text);
+  background: var(--border);
+}
+
+.px-password-toggle-field-toggle:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.px-password-toggle-field-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.px-password-toggle-field-icon {
+  display: inline-flex;
+}
+
+.px-password-toggle-field-icon svg {
+  display: block;
+}
+
+.px-password-toggle-field-icon-hide {
+  display: none;
+}
+
+.px-password-toggle-field-toggle[data-visible="true"] .px-password-toggle-field-icon-show {
+  display: none;
+}
+
+.px-password-toggle-field-toggle[data-visible="true"] .px-password-toggle-field-icon-hide {
+  display: inline-flex;
+}
+
+/* Demo layout (px_ui:demo(password_toggle_field, ...), /ui/password_toggle_field). */
+
+.px-password-toggle-field-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 26rem;
+}
+
+.px-password-toggle-field-row {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.px-password-toggle-field-row p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-password-toggle-field-demo h3 {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+/* ---------------------------------------------------------------- */
+/* Form (adr/0026). NATIVE-dominant: the Constraint Validation API   */
+/* computes validity with zero JS; assets/js/components/form.js only */
+/* mirrors the result onto the data-valid/data-invalid contract      */
+/* below. See prolog/ui/form.pl's module header for the full         */
+/* Field/Label/Control/Message anatomy and its relationship to       */
+/* prolog/px_form.pl (adr/0023) -- ui/form's client-side complement.  */
+/* --accent family for a valid, focused control; --danger for        */
+/* invalid, per the task brief.                                      */
+/* ---------------------------------------------------------------- */
+
+.px-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  max-width: 28rem;
+}
+
+.px-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.px-form-label {
+  display: block;
+}
+
+/* Control reuses assets/css/app.css's own bare input[type=...]/
+   textarea/select styling (box, border, focus ring) -- this section
+   only adds what that global styling does not know about: the
+   data-valid/data-invalid contract, which app.css's class-free
+   selectors cannot key off. */
+
+.px-form-control[data-invalid] {
+  border-color: var(--danger);
+}
+
+.px-form-control[data-invalid]:focus {
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.25);
+}
+
+.px-form-control[data-valid]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.25);
+}
+
+.px-form-message {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.px-form-submit {
+  align-self: flex-start;
+}
+
+/* Demo-only (px_ui:demo(form, ...), /ui/form). */
+
+.ui-demo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  max-width: 28rem;
+}
+
+.ui-demo-form > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.ui-demo-form h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+/* ---------------------------------------------------------------- */
+/* Toast (adr/0026). CUSTOM-ELEMENT: no platform primitive covers      */
+/* auto-dismiss timers, pause-on-hover, or an F8-reachable stacking    */
+/* viewport -- see prolog/ui/toast.pl's module header for the full     */
+/* platform-split rationale (a fixed-position <ol>/<li> region, no     */
+/* portal needed since nothing here is server-rendered out of its      */
+/* natural DOM position). `px-toast-viewport`/`px-toast` are given     */
+/* `display: contents` (bare tag selectors, not classes -- deliberately*/
+/* not covered by test/ui/css_coverage.pl's `.px-*` scan) so the       */
+/* custom-element wrapper never disrupts `<ol>`'s implicit ARIA list   */
+/* relationship with its `<li>` children or the flex stacking below --  */
+/* the same precedent hover_card.pl's own `px-hover-card { display:    */
+/* contents; }` rule established.                                     */
+/* ---------------------------------------------------------------- */
+
+px-toast-viewport,
+px-toast {
+  display: contents;
+}
+
+/* Fixed bottom-right stack. `column-reverse` + Turbo's own `prepend`
+   action (adr/0024) landing new toasts as the FIRST <px-toast> child
+   together produce "new toast appears at the bottom edge, older ones
+   get pushed up" -- Radix's own reference demo stacking order -- with
+   zero JS reordering logic. */
+.px-toast-viewport {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 100;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.6rem;
+  width: min(24rem, calc(100vw - 2rem));
+  max-height: 100vh;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  outline: none;
+}
+
+.px-toast-viewport:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* The panel card. Enter: a slide-in-from-the-right + fade via
+   @starting-style (dialog.pl's/hover_card.pl's own precedent for a
+   zero-JS Presence-equivalent, adr/0026's shared-machinery notes on
+   react-presence's common case). Exit: `assets/js/components/
+   toast.js`'s EXIT_MS constant (200ms) matches this transition's own
+   duration -- the fixed timeout that class uses to time DOM removal
+   after data-state flips to "closed" is deliberately kept in lockstep
+   with the numbers below; changing one without the other reintroduces
+   the "remove before the animation finishes" pop the analysis doc's
+   own Presence discussion warns about. */
+.px-toast {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.9rem 2.25rem 0.9rem 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 0.2s ease, transform 0.2s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.px-toast[data-state="closed"] {
+  opacity: 0;
+  transform: translateX(6%);
+}
+
+@starting-style {
+  .px-toast[data-state="open"] {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* Pause-on-hover/focus affordance (assets/js/components/toast.js sets
+   `data-paused="true"` while the pointer/keyboard focus is inside a
+   toast whose timer would otherwise be counting down) -- an
+   accent-colored ring, the same visual language
+   `.px-dialog-trigger[data-state="open"]` and focus-visible rings
+   elsewhere in this library already use for "something is
+   active/held". */
+.px-toast[data-paused="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--accent);
+}
+
+.px-toast-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.px-toast-description {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.px-toast-action {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.px-toast-action:hover {
+  border-color: var(--accent);
+}
+
+.px-toast-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+}
+
+.px-toast-close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.px-toast-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+.px-toast-close:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* Demo layout (px_ui:demo(toast, ...), /ui/toast). */
+
+.px-toast-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 34rem;
+}
+
+.px-toast-demo h3 {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-toast-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-toast-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-toast-demo pre {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  overflow: auto;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.px-toast-demo-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.px-toast-demo-trigger:hover {
+  border-color: var(--accent);
+}
+
+.px-toast-demo-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }

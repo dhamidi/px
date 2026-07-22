@@ -142,6 +142,34 @@ import "components/menubar";
 // (from-start/from-end/to-start/to-end) from comparing trigger list
 // order on every switch.
 import "components/navigation_menu";
+// <px-otp-field> is ui/otp_field.pl's (adr/0026): a hand-rolled
+// keyboard/paste state machine over N single-character cells -- does
+// NOT import "lib/roving-focus" (see that module's Prolog header for
+// why the shape doesn't fit: every cell stays in the normal Tab
+// order, there is no single roving tab stop). This element's own job:
+// auto-advance focus on typing, Backspace/Cmd+Backspace/ArrowLeft/
+// ArrowRight navigation, sanitizing + distributing a pasted or
+// autofill-delivered full code across every cell, clamping click-to-
+// focus at the first not-yet-filled cell, and keeping the sibling
+// HiddenInput's `value` (plus each cell's own `data-filled` styling
+// hook) live on every change.
+import "components/otp_field";
+// <px-scroll-area> is ui/scroll_area.pl's (adr/0026): platform-first --
+// the real scrolling and the real visible scrollbar are both native
+// (Viewport is `overflow: auto`, recolored via scrollbar-width/
+// scrollbar-color + ::-webkit-scrollbar*, assets/css/ui.css); the
+// decorative Scrollbar/Thumb/Corner anatomy is rendered for DOM/
+// data-attribute contract fidelity only and is never painted. This
+// element is a no-op for type=auto/always (both are static, zero JS);
+// for type=hover/scroll -- the only two paths with no platform
+// equivalent -- it toggles data-state=visible|hidden on the decorative
+// Scrollbar part(s) (pointerenter/leave on Root for hover; Viewport
+// `scroll` + a scrollHideDelay-driven timeout, 600ms default, for
+// scroll), which a `:has()` selector in ui.css keys the real
+// scrollbar's color off. No ResizeObserver, no requestAnimationFrame
+// polling, no pointer-capture drag math -- none of that is needed once
+// the real scrollbar already IS the visual thumb.
+import "components/scroll_area";
 // <px-slider> is ui/slider.pl's (adr/0026): NATIVE single-thumb --
 // the real, styled `<input type=range>` already drags, keys and
 // submits with zero JS (it IS the visible thumb; see that module's
@@ -152,3 +180,32 @@ import "components/navigation_menu";
 // input's native `input` event while dragging/keying, since nothing
 // re-runs server-side markup mid-drag.
 import "components/slider";
+import "components/password_toggle_field";
+// <px-form> is ui/form.pl's (adr/0026): the native Constraint
+// Validation API (required/type=email/pattern/minlength/...) already
+// computes correct element.validity with zero JS; this element's own
+// job is purely the trigger + attribute mirroring novalidate turns
+// off -- checkValidity() on focusout/submit, toggling
+// data-valid/data-invalid on Field/Label/Control and hidden on the
+// matching Message(s), preventDefault()-ing an invalid submit and
+// focusing the first invalid control. Never touches aria-invalid
+// (server-only truth, prolog/px_form.pl's adr/0023 422 escape hatch)
+// or any Message carrying data-forced (real server error text, left
+// undisturbed).
+import "components/form";
+// <px-toast-viewport>/<px-toast> are ui/toast.pl's (adr/0026): an F8
+// hotkey that focuses the viewport's <ol> (toggling focus back on a
+// second press), plus per-toast duration auto-dismiss timers that
+// pause on pointerenter/focusin and resume -- via elapsed-time
+// SUBTRACTION, not a hard reset -- on pointerleave/focusout, a
+// data-toast-close click handler, and DOM removal once the
+// data-state="closed" exit transition has had time to play. Nothing
+// here implements swipe-to-dismiss (data-swipe-direction is emitted
+// statically by the server and never touched) -- a documented,
+// deliberate deferral; see that module's own header and
+// prolog/ui/toast.pl's for the full accounting. Any toast reaching the
+// DOM upgrades identically regardless of how it arrived: a page load,
+// a client-side <template> clone, or a Turbo Stream `prepend` action
+// from any server handler (adr/0024) -- the "prologex-native angle"
+// prolog/ui/toast.pl's header and /ui/toast's own demo both document.
+import "components/toast";
