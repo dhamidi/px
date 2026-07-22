@@ -45,3 +45,12 @@ import "components/accordion";
 // own header) -- must load after "components/toggle_group" so that
 // reach-in target is registered first.
 import "components/toolbar";
+// <px-popover> is ui/popover.pl's (adr/0026): the first consumer of
+// "lib/popper" (assets/js/lib/popper.js). Trigger's native
+// `popovertarget` and Content's native `popover="auto"` already
+// open/close/dismiss with zero JS (top-layer + Escape/click-outside);
+// this element's only job is positioning Content relative to Trigger
+// (side/align/collision-flip) on the native `beforetoggle`/`toggle`
+// events, keeping it positioned via popper.js's `autoUpdate` while
+// open.
+import "components/popover";

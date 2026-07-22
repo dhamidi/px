@@ -51,15 +51,30 @@ custom elements served through the asset pipeline (adr/0025) importmap.
    `assets/css/ui.css` keyed off its data-attributes, using the app
    theme vars (adr/0025 pipeline serves it; px_ui's demo layout links
    it). Tasteful defaults, dark-theme native, overridable by apps.
-7. **Every port ships with proof**: (a) a render test in
-   `test/ui/<name>.pl` asserting the ARIA/data contract from rendered
-   output (render_to_string), (b) a live demo: the component registers
-   `px_ui:demo(Name, Order, DemoTemplateCall)` (multifile) and the
-   kitchen-sink app at `/ui` (list) + `/ui/<name>` (render) picks it
-   up automatically — the reviewer's acceptance bar is the demo page
-   looking and behaving right, (c) a `git commit` + push of exactly
-   its files: `Port ui/<name> (adr/0026)` with the standard
-   Co-Authored-By trailer.
+7. **Every port ships with proof** — hardened after the visual audit
+   (docs/ui-visual-audit.md) caught a component whose render test
+   "passed" while asserting broken markup: (a) a render test in
+   `test/ui/<name>.pl` asserting the ARIA/data contract AND every
+   CSS-hook class the component's ui.css section selects on, by name —
+   never snapshot-asserting whatever the implementation currently
+   emits; (b) `px_ui:demo(Name, Order, DemoTemplateCall)` registration
+   for the kitchen-sink at `/ui/<name>`; (c) **browser verification,
+   not curl**: drive headless Chrome over CDP (`/headless-shell`,
+   `--remote-debugging-port`; the one-shot `--screenshot` flag hangs)
+   against the demo page — screenshot it and *look* at it (styled, not
+   native-widget fallback), assert zero console errors, and for
+   interactive components dispatch a real click and assert a genuine
+   before/after delta in both attributes and pixels (clicking an
+   already-active element and getting identical screenshots is the
+   documented false-reassurance trap); (d) the css-coverage test
+   (`test/ui/css_coverage.pl`) must stay green: every `.px-*` selector
+   in ui.css appears in some rendered demo page; (e) **restart the
+   deployed service after landing** — assets compile at startup only,
+   so until restart the live site serves the previous bundle and a
+   freshly-landed demo renders unstyled (exactly what shipped the
+   first bad impression); verify the restarted live instance, then
+   (f) `git commit` + push of exactly its files: `Port ui/<name>
+   (adr/0026)` with the standard Co-Authored-By trailer.
 8. **Porting order** is the analysis doc's recommended order —
    statics, then native-backed, then roving-focus consumers, dialogs,
    positioning tier, menus, and Select last. A component agent must

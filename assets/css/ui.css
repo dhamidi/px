@@ -1376,3 +1376,189 @@ px-accordion {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Popover (adr/0026). CUSTOM-ELEMENT, partially platform-assisted:    */
+/* Content's native `popover="auto"` attribute gives top-layer         */
+/* stacking + Escape/click-outside light-dismiss with zero JS;         */
+/* Trigger/Close's native `popovertarget` open/close it with zero JS   */
+/* too -- <px-popover> (assets/js/components/popover.js) only adds     */
+/* positioning, via assets/js/lib/popper.js's position/autoUpdate,     */
+/* this shared module's proving consumer. See prolog/ui/popover.pl's   */
+/* module header for the full platform-split rationale. Every rule     */
+/* below targets [data-state]/[data-side]/[data-align], the same       */
+/* popper.js styling contract Tooltip/HoverCard/Menu will share.       */
+/* ---------------------------------------------------------------- */
+
+px-popover {
+  display: contents;
+}
+
+.px-popover {
+  display: contents;
+}
+
+.px-popover-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.px-popover-trigger:hover {
+  border-color: var(--accent);
+}
+
+.px-popover-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+}
+
+.px-popover-trigger[data-state="open"] {
+  border-color: var(--accent);
+}
+
+/* Popover Content is promoted to the top layer by the native
+   `popover` attribute regardless of its DOM position, so `position:
+   fixed`/`left`/`top` (written by lib/popper.js's `position/3`) place
+   it correctly relative to the viewport with no portal machinery
+   needed -- the UA stylesheet's own `position: fixed; inset: 0` for
+   `[popover]` is overridden here since lib/popper.js always sets an
+   explicit `left`/`top` while open. */
+.px-popover-content {
+  margin: 0;                     /* override the UA popover stylesheet's centering margin */
+  padding: 0.9rem 1rem;
+  max-width: 20rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.px-popover-content:not(:popover-open) {
+  display: none;
+}
+
+.px-popover-content h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.px-popover-content p {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-popover-content p:last-of-type {
+  margin-bottom: 0;
+}
+
+.px-popover-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.px-popover-close:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.px-popover-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+}
+
+/* Arrow: a plain rotated square, positioned at the panel's edge facing
+   the trigger -- keyed off Content's own [data-side], per
+   prolog/ui/popover.pl's header ("Pure markup; ... no JS"). */
+.px-popover-arrow {
+  position: absolute;
+  width: 0.6rem;
+  height: 0.6rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+
+.px-popover-content[data-side="top"] > .px-popover-arrow {
+  bottom: -0.35rem;
+  left: 1rem;
+  border-top: none;
+  border-left: none;
+}
+
+.px-popover-content[data-side="bottom"] > .px-popover-arrow {
+  top: -0.35rem;
+  left: 1rem;
+  border-bottom: none;
+  border-right: none;
+}
+
+.px-popover-content[data-side="left"] > .px-popover-arrow {
+  right: -0.35rem;
+  top: 1rem;
+  border-bottom: none;
+  border-left: none;
+}
+
+.px-popover-content[data-side="right"] > .px-popover-arrow {
+  left: -0.35rem;
+  top: 1rem;
+  border-top: none;
+  border-right: none;
+}
+
+/* Demo layout (px_ui:demo(popover, ...), /ui/popover). */
+
+.px-popover-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 40rem;
+}
+
+.px-popover-demo h3 {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-popover-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-popover-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-popover-sides-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  padding: 2rem;
+}
+
