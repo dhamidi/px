@@ -29,6 +29,14 @@ import "components/toggle_group";
 // Triggers, plus automatic (focus-driven) activation switching
 // aria-selected/data-state/hidden across Triggers/Content.
 import "components/tabs";
+// <px-accordion> is ui/accordion.pl's (adr/0026): a roving-focus
+// consumer over Triggers (vertical), blocking the close of the one
+// mandatory-open item via `beforetoggle` when type=single/
+// collapsible=false (native <details name> grouping already handles
+// opening-exclusivity with zero JS), and re-syncing data-state/
+// aria-expanded/aria-controls/aria-disabled after native toggle
+// events.
+import "components/accordion";
 // <px-toolbar> is ui/toolbar.pl's (adr/0026): another roving-focus
 // consumer -- ONE arrow-key/Home/End scope spanning every Button, Link
 // and embedded Toggle Group Item as a single flat tab-stop domain, plus

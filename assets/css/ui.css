@@ -1239,3 +1239,140 @@ px-toolbar {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Accordion (adr/0026). CUSTOM-ELEMENT: a roving-focus consumer      */
+/* (assets/js/lib/roving-focus.js), built on the same <details>/      */
+/* <summary> platform choice as Collapsible -- see                    */
+/* prolog/ui/accordion.pl's module header for the full contract,      */
+/* including why Header (`<h3>`) is nested INSIDE Trigger's           */
+/* <summary> rather than wrapping it (a hard HTML constraint, not a   */
+/* styling choice). type=single renders the same bordered stack as    */
+/* type=multiple -- the only difference is a shared native `name`     */
+/* group giving open-exclusivity with zero JS. Every rule below       */
+/* targets `[data-state=...]`, never `[open]`, per adr/0026 rule 2's  */
+/* styling-API mandate (Collapsible's own CSS predates that and still */
+/* uses `[open]` -- not repeated here).                               */
+/* ---------------------------------------------------------------- */
+
+px-accordion {
+  display: block;
+}
+
+.px-accordion {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.px-accordion-item + .px-accordion-item {
+  border-top: 1px solid var(--border);
+}
+
+.px-accordion-trigger {
+  display: block;
+  cursor: pointer;
+  list-style: none;              /* drop the browser's default disclosure triangle */
+  user-select: none;
+}
+
+.px-accordion-trigger::-webkit-details-marker {
+  display: none;                 /* Safari/Chrome's own default marker, not ::marker */
+}
+
+.px-accordion-trigger::marker {
+  content: "";
+}
+
+.px-accordion-trigger:focus-visible {
+  outline: none;
+}
+
+.px-accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+
+.px-accordion-trigger:hover .px-accordion-header {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.px-accordion-trigger:focus-visible .px-accordion-header {
+  box-shadow: inset 0 0 0 2px var(--accent);
+  border-radius: 4px;
+}
+
+.px-accordion-header::after {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+}
+
+.px-accordion-header[data-state="open"]::after {
+  transform: rotate(45deg);
+}
+
+.px-accordion-content {
+  padding: 0 1rem 1rem;
+  color: var(--muted);
+}
+
+.px-accordion-content > :last-child {
+  margin-bottom: 0;
+}
+
+.px-accordion-header[data-disabled],
+.px-accordion-content[data-disabled] {
+  opacity: 0.5;
+}
+
+.px-accordion-trigger[data-disabled] {
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.px-accordion-trigger[aria-disabled="true"] {
+  cursor: default;
+}
+
+/* Demo layout (px_ui:demo(accordion, ...), /ui/accordion). */
+
+.px-accordion-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 32rem;
+}
+
+.px-accordion-demo h3 {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-accordion-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-accordion-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
