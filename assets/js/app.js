@@ -14,3 +14,7 @@ import "components/avatar";
 // <px-switch> is ui/switch.pl's (adr/0026): keeps aria-checked/data-state
 // live on click -- the platform already handles the toggle itself.
 import "components/switch";
+// <px-checkbox> is ui/checkbox.pl's (adr/0026): only wraps the
+// indeterminate case -- sets the JS-only .indeterminate property and
+// keeps aria-checked/data-state live once a click resolves it away.
+import "components/checkbox";

@@ -754,3 +754,129 @@ px-switch {
   color: var(--muted);
   font-size: 0.9rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Checkbox (adr/0026). NATIVE for checked/unchecked: a real           */
+/* <input type=checkbox role=checkbox> (appearance: none, styled       */
+/* directly) drives the box via the browser's own :checked             */
+/* pseudo-class -- zero JS, instant on click, keyboard included.       */
+/* [data-state=...] is ALSO targeted throughout (the sacred adr/0026   */
+/* rule-2 styling API), so the box/glyph paint correctly from a plain  */
+/* server render even before any :checked match, and stay correct for */
+/* the indeterminate case, which has no CSS pseudo-class equivalent at */
+/* all. `<px-checkbox>` (assets/js/components/checkbox.js) only wraps  */
+/* the indeterminate case -- see prolog/ui/checkbox.pl's module header */
+/* for the full contract and why this differs from Switch, which wraps */
+/* every instance. The Indicator (`.px-checkbox-indicator`) is         */
+/* Presence-gated server-side (absent from the DOM entirely when       */
+/* unchecked), so its glyph is drawn unconditionally whenever the      */
+/* element exists at all -- no extra visibility toggling needed here.  */
+/* ---------------------------------------------------------------- */
+
+px-checkbox {
+  display: inline-flex;
+}
+
+.px-checkbox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.px-checkbox[data-disabled] {
+  cursor: not-allowed;
+}
+
+.px-checkbox-input {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  cursor: inherit;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.px-checkbox-input:checked,
+.px-checkbox-input[data-state="checked"],
+.px-checkbox-input[data-state="indeterminate"] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.px-checkbox-input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+}
+
+.px-checkbox-input:disabled,
+.px-checkbox-input[data-disabled] {
+  opacity: 0.5;
+}
+
+.px-checkbox-indicator {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.px-checkbox-indicator::after {
+  content: "";
+  display: block;
+  box-sizing: border-box;
+}
+
+.px-checkbox-indicator[data-state="checked"]::after {
+  width: 0.6rem;
+  height: 0.32rem;
+  border-left: 2px solid #0f1115;
+  border-bottom: 2px solid #0f1115;
+  transform: rotate(-45deg) translate(1px, -2px);
+}
+
+.px-checkbox-indicator[data-state="indeterminate"]::after {
+  width: 0.6rem;
+  height: 2px;
+  background: #0f1115;
+}
+
+/* Demo layout (px_ui:demo(checkbox, ...), /ui/checkbox). */
+
+.ui-demo-checkbox .field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.ui-demo-checkbox p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 30rem;
+}
+
+.ui-demo-checkbox h3 {
+  margin: 1.5rem 0 0.4rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.ui-demo-checkbox form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 24rem;
+  margin-top: 0.75rem;
+}
