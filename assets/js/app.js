@@ -209,3 +209,20 @@ import "components/form";
 // from any server handler (adr/0024) -- the "prologex-native angle"
 // prolog/ui/toast.pl's header and /ui/toast's own demo both document.
 import "components/toast";
+// <px-select> is ui/select.pl's (adr/0026): the port's finale (33/33).
+// The no-JS fallback is a REAL native <select> (form-submittable,
+// always present, always in sync with the custom markup -- both
+// derived from the same Items list server-side); this element hides
+// that native control (keeping it as the value store, synced on every
+// selection via its own property-setter descriptor + a real bubbling
+// change event) and enables the custom trigger+listbox UI: open/close,
+// "lib/popper"-driven positioning (popper mode only, side="bottom"
+// always, width pinned to the Trigger's own via a CSS custom
+// property), roving highlight-is-focus with no aria-activedescendant,
+// and two-mode typeahead (closed-trigger direct-jump select, like
+// native <select>; open-content highlight-only, Enter/Space commits).
+// See that file's own header for the full mechanism and for why this
+// hand-rolls its own item collection/typeahead rather than importing
+// "lib/menu" (borrowed ideas, not shared code -- Select's listbox
+// shape and closed-trigger keyboard surface are different enough).
+import "components/select";

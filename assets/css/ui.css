@@ -3956,3 +3956,281 @@ px-toast {
   outline: none;
   box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
 }
+
+/* ---------------------------------------------------------------- */
+/* Select (adr/0026): the port's finale (33/33). prolog/ui/select.pl's */
+/* own header, "No-JS fallback": the real native <select> is the       */
+/* default visible control; the custom Trigger stays hidden until      */
+/* `px-select:defined` -- the CSS `:defined` pseudo-class needs no JS   */
+/* to flip (it becomes true the moment                                 */
+/* assets/js/components/select.js's customElements.define runs),       */
+/* which is why it was chosen over a JS-set marker attribute (rule 3,  */
+/* "platform first", pushed as far as this port can take it). Content's */
+/* own hiddenness while closed needs no CSS at all -- the native        */
+/* `popover` UA stylesheet already hides any `[popover]` element unless */
+/* `:popover-open`. `--px-select-trigger-width` is written by that same */
+/* element on every position pass (prolog/ui/select.pl's "Positioning"  */
+/* decision: popper mode only, side="bottom" always, full trigger       */
+/* width) -- `.px-select-content`'s own `width` reads it, with a        */
+/* `min-width` fallback for the (JS-not-yet-run) instant between        */
+/* `:defined` flipping and the first `toggle` event ever firing.        */
+/* ---------------------------------------------------------------- */
+
+px-select {
+  display: contents;
+}
+
+.px-select {
+  display: inline-block;
+}
+
+.px-select-trigger,
+.px-select-content {
+  display: none;
+}
+
+px-select:defined .px-select-native {
+  position: absolute;
+  border: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+px-select:defined .px-select-trigger {
+  display: inline-flex;
+}
+
+.px-select-native {
+  min-width: 12rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+/* Trigger: styled like a text input (task brief) -- same border/panel/
+   radius language `.px-form-control` uses, not the borderless-pill
+   look `.px-dropdown-menu-trigger`'s own menu-flavoured Trigger has,
+   since Select's Trigger *replaces* an `<input>`-shaped control. */
+.px-select-trigger {
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  min-width: 12rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.px-select-trigger:hover {
+  border-color: var(--accent);
+}
+
+.px-select-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+}
+
+.px-select-trigger[data-state="open"] {
+  border-color: var(--accent);
+}
+
+.px-select-trigger[data-disabled] {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.px-select-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.px-select-value[data-placeholder] {
+  color: var(--muted);
+}
+
+.px-select-icon {
+  flex: none;
+  display: inline-flex;
+  color: var(--muted);
+  font-size: 0.75rem;
+  transition: transform 0.15s ease;
+}
+
+.px-select-trigger[data-state="open"] .px-select-icon {
+  transform: rotate(180deg);
+}
+
+/* Content: the listbox panel -- same box language `.px-menu-content`
+   uses (task brief: "listbox panel matching menu panels"), pinned to
+   the Trigger's own width instead of a fixed min-width. No max-height/
+   overflow here -- documented deferral, prolog/ui/select.pl's own
+   header ("no ScrollUpButton/ScrollDownButton... never scrolls"). */
+.px-select-content {
+  position: fixed; /* overwritten with an explicit left/top by lib/popper.js while open */
+  margin: 0;        /* override the UA popover stylesheet's centering margin */
+  width: var(--px-select-trigger-width, 12rem);
+  min-width: 12rem;
+  padding: 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+/* Same explicit companion rule `.px-menu-content:not(:popover-open)`
+   uses -- the unconditional `display: flex` two rules up would
+   otherwise fight the native `[popover]` UA-stylesheet hiding once
+   this class's own specificity is in play; making it explicit, not
+   relying on cascade order against the UA sheet, is this library's
+   established convention. */
+.px-select-content:not(:popover-open) {
+  display: none;
+}
+
+.px-select-content:popover-open {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@starting-style {
+  .px-select-content:popover-open {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.px-select-content {
+  transition: opacity 0.1s ease-out, transform 0.1s ease-out;
+}
+
+/* Item: same row treatment `.px-menu-item` uses -- checkmark reserves a
+   leading column (task brief: "checkmark indicator column") so every
+   row's text lines up regardless of whether it's the selected one.
+   [data-highlighted] (never server-rendered -- assets/js/components/
+   select.js's own job, mirroring live DOM focus) is the single visual
+   "current" state (task brief: "data-highlighted row"). */
+.px-select-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem 0.45rem 2rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+  position: relative;
+}
+
+.px-select-item[data-highlighted] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.px-select-item[data-disabled] {
+  color: var(--muted);
+  cursor: default;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.px-select-item-indicator {
+  position: absolute;
+  left: 0.6rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+/* Documented simplification (prolog/ui/select.pl's header, same as
+   `_menu.pl`'s own ItemIndicator): always rendered, never
+   Presence-gated -- this is the CSS half, hiding it visually rather
+   than omitting it from the DOM. */
+.px-select-item-indicator[data-state="unchecked"] {
+  visibility: hidden;
+}
+
+.px-select-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.px-select-label {
+  padding: 0.4rem 0.6rem 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.px-select-separator {
+  margin: 0.35rem 0.3rem;
+}
+
+/* Demo layout (px_ui:demo(select, ...), /ui/select). */
+
+.px-select-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 26rem;
+}
+
+.px-select-demo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-select-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-select-demo-form {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.px-select-demo-submit {
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.px-select-demo-submit:hover {
+  background: var(--accent-hover);
+}
