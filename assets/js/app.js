@@ -74,3 +74,17 @@ import "components/dialog";
 // Escape to close immediately, touch pointers ignored -- plus
 // position/autoUpdate for placement, same as components/popover.js.
 import "components/tooltip";
+// <px-hover-card> is ui/hover_card.pl's (adr/0026): "lib/popper"'s next
+// consumer after Popover/Tooltip, standalone (no dependency on either
+// sibling's element -- shares only the popper.js positioning module).
+// Content's native `popover="auto"` gives Escape/outside-click dismiss
+// with zero JS (a deliberately different choice than Tooltip's
+// `manual` -- see prolog/ui/hover_card.pl's header for why); this
+// element supplies the one thing the platform has no primitive for at
+// all -- openDelay/closeDelay hover timers (700ms/300ms, Radix's
+// defaults), with pointerenter on Content itself canceling a pending
+// close timer as the "reach the card before closeDelay elapses" grace
+// bridge -- plus position/autoUpdate for placement, same as
+// components/popover.js. Mouse-pointer only; never opens via focus,
+// click, or touch, matching upstream's hover-only-by-design scope.
+import "components/hover_card";

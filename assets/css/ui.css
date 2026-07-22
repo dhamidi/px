@@ -2072,3 +2072,217 @@ px-dialog,
   gap: 0.75rem;
   margin-top: 1.5rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Hover Card (adr/0026). CUSTOM-ELEMENT: hover-delay timers have no   */
+/* platform analog at all -- see prolog/ui/hover_card.pl's module      */
+/* header for the full platform-split rationale. Content is promoted   */
+/* to the top layer by native `popover="auto"` regardless of DOM       */
+/* position (same as popover.pl's own Content, just JS-driven rather   */
+/* than popovertarget-driven -- see that module header's "Platform     */
+/* choice" for why `auto`, not Tooltip's `manual`); `position: fixed`  */
+/* /`left`/`top` (written by lib/popper.js's `position/3`) place it    */
+/* relative to the viewport, same as .px-popover-content. Every rule    */
+/* below targets [data-state]/[data-side]/[data-align], the same       */
+/* popper.js styling contract .px-popover-content shares.              */
+/* ---------------------------------------------------------------- */
+
+px-hover-card,
+.px-hover-card {
+  display: contents;
+}
+
+/* The trigger is an <a>, not a button (docs/radix-port-analysis.md:
+   "reflects the 'preview a link' use case") -- styled as a plain
+   inline link with a hover/open-state underline color shift, not a
+   button-shaped control. */
+.px-hover-card-trigger {
+  color: var(--accent-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.px-hover-card-trigger:hover,
+.px-hover-card-trigger[data-state="open"] {
+  text-decoration-color: var(--accent);
+}
+
+.px-hover-card-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+  border-radius: 2px;
+}
+
+/* Content: same panel treatment as .px-popover-content, plus a fade +
+   slight rise entrance via @starting-style (Chromium 117+, confirmed
+   present in the /headless-shell build this port was verified
+   against -- adr/0026 rule 7(c)) -- popover.pl's own Content has no
+   entrance animation; this is HoverCard's one visual addition,
+   matching Radix Themes' own hover-card fade-in. Exit is intentionally
+   instant (no `transition-behavior: allow-discrete` staging) -- kept
+   simple so closeDelay's own timing is the only thing a consumer (or
+   this port's own CDP verification) needs to reason about. */
+.px-hover-card-content {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  max-width: 22rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.px-hover-card-content:not(:popover-open) {
+  display: none;
+}
+
+.px-hover-card-content:popover-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@starting-style {
+  .px-hover-card-content:popover-open {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.px-hover-card-content h4 {
+  margin: 0 0 0.15rem;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.px-hover-card-content p {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-hover-card-content p:last-of-type {
+  margin-bottom: 0;
+}
+
+/* Arrow: identical shape/positioning to .px-popover-arrow, keyed off
+   the parent Content's own [data-side]. */
+.px-hover-card-arrow {
+  position: absolute;
+  width: 0.6rem;
+  height: 0.6rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  transform: rotate(45deg);
+}
+
+.px-hover-card-content[data-side="top"] > .px-hover-card-arrow {
+  bottom: -0.35rem;
+  left: 1rem;
+  border-top: none;
+  border-left: none;
+}
+
+.px-hover-card-content[data-side="bottom"] > .px-hover-card-arrow {
+  top: -0.35rem;
+  left: 1rem;
+  border-bottom: none;
+  border-right: none;
+}
+
+.px-hover-card-content[data-side="left"] > .px-hover-card-arrow {
+  right: -0.35rem;
+  top: 1rem;
+  border-bottom: none;
+  border-left: none;
+}
+
+.px-hover-card-content[data-side="right"] > .px-hover-card-arrow {
+  left: -0.35rem;
+  top: 1rem;
+  border-top: none;
+  border-right: none;
+}
+
+/* Profile-preview card body (px_ui:demo(hover_card, ...) -- the
+   classic "@handle" card, also the shape a consumer app's own content
+   would realistically use). */
+.px-hover-card-profile {
+  display: flex;
+  gap: 0.85rem;
+  align-items: flex-start;
+}
+
+.px-hover-card-avatar {
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--accent-contrast);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+}
+
+.px-hover-card-handle {
+  margin: 0 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.px-hover-card-stats {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.px-hover-card-stats strong {
+  color: var(--text);
+}
+
+/* Demo layout (px_ui:demo(hover_card, ...), /ui/hover_card). */
+
+.px-hover-card-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 40rem;
+}
+
+.px-hover-card-demo h3 {
+  margin: 1.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-hover-card-demo h3:first-child {
+  margin-top: 0;
+}
+
+.px-hover-card-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.px-hover-card-demo-prose {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.px-hover-card-sides-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2.5rem;
+  padding: 2rem;
+}
