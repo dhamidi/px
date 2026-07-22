@@ -1,0 +1,18 @@
+# Compiled C FFI artifacts (rebuilt via c/Makefile; sources are tracked)
+c/*.so
+c/sqlite3.o
+
+# Runtime data (sqlite db + wal/shm)
+data/
+
+# Backup files
+*.bak
+
+# Temp artifacts
+/tmp/
+*.tmp
+
+# Compiled Prolog QLF files
+*.qlf
+
+# Note: vendor/ IS committed (vendoring philosophy, see adr/0003).
