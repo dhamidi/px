@@ -542,3 +542,117 @@ px-avatar[data-state="error"] .px-avatar-image {
   color: var(--muted);
   font-size: 0.85rem;
 }
+
+/* ---------------------------------------------------------------- */
+/* Radio Group (adr/0026). NATIVE: a real <input type="radio"        */
+/* name="..."> group gives selection *and* arrow-key roving-focus-   */
+/* equivalent keyboard behaviour for free -- see prolog/ui/           */
+/* radio_group.pl's module header for the full contract and its two  */
+/* documented native-variant deviations (no explicit role/aria-      */
+/* checked on the input; data-state/data-disabled live on the        */
+/* wrapper <label> instead).                                         */
+/*                                                                    */
+/* Styling technique deviation (the analysis doc's own words: "a CSS */
+/* technique difference, not a capability gap"): the selected/        */
+/* unselected dot below is driven entirely by the *live* native       */
+/* :checked/:disabled pseudo-classes on .px-radio-group-input, NEVER  */
+/* by [data-state=...]/[data-disabled] -- those two are emitted on    */
+/* the wrapper purely to satisfy the sacred DOM contract (adr/0026    */
+/* rule 2) at initial render; without client JS they cannot be kept   */
+/* in sync after the user arrow-keys/clicks to a different sibling    */
+/* radio, so nothing here relies on them staying current. `:checked`  */
+/* always is current -- the browser guarantees it -- which is exactly */
+/* the native-coverage win this component gets for zero JS.           */
+/* ---------------------------------------------------------------- */
+
+.px-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.px-radio-group[aria-orientation="horizontal"] {
+  flex-direction: row;
+  gap: 1.5rem;
+}
+
+.px-radio-group[data-disabled] {
+  opacity: 0.6;
+}
+
+.px-radio-group-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.px-radio-group-item[data-disabled] {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+.px-radio-group-input {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  flex: 0 0 auto;
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  display: grid;
+  place-content: center;
+  cursor: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.px-radio-group-input::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+  transform: scale(0);
+  transition: transform 0.12s ease;
+}
+
+.px-radio-group-input:checked {
+  border-color: var(--accent);
+}
+
+.px-radio-group-input:checked::before {
+  transform: scale(1);
+}
+
+.px-radio-group-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.px-radio-group-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.px-radio-group-label {
+  line-height: 1.3;
+}
+
+/* Demo layout (px_ui:demo(radio_group, ...), /ui/radio_group). */
+
+.px-radio-group-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  max-width: 26rem;
+}
+
+.px-radio-group-demo p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
