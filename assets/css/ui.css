@@ -2625,3 +2625,101 @@ px-context-menu {
   color: var(--text);
 }
 
+
+/* ---------------------------------------------------------------- */
+/* Menubar (adr/0026): prolog/ui/menubar.pl -- Root bar + Trigger      */
+/* highlight styling only; Menu (`.px-menubar-menu`) is `display:       */
+/* contents` (no visual box of its own -- the Trigger is what's        */
+/* visually "in" the bar, exactly like `.px-dropdown-menu`'s own Root   */
+/* wrapper above); Content/Item/etc. all reuse the shared px-menu-*     */
+/* classes above (side="bottom" align="start" defaults, per             */
+/* menubar.pl's own header -- no new Content CSS needed here at all).   */
+/* Trigger highlight reuses `.px-menu-item[data-highlighted]`'s own     */
+/* accent-fill treatment (a few sections up) for both                   */
+/* `data-state="open"` and `data-highlighted` -- an open menu's trigger  */
+/* should read exactly like the highlighted row inside its own Content, */
+/* matching Radix's own Menubar demo (radix-ui.com/primitives/docs/     */
+/* components/menubar): a flat, borderless trigger row that fills solid */
+/* on open/hover rather than the bordered-button look                   */
+/* `.px-dropdown-menu-trigger` uses standalone.                         */
+/* ---------------------------------------------------------------- */
+
+px-menubar {
+  display: contents;
+}
+
+.px-menubar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.px-menubar-menu {
+  display: contents;
+}
+
+.px-menubar-trigger {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 0.85rem;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.px-menubar-trigger:hover {
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.px-menubar-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+}
+
+/* The currently-open menu's own trigger, AND (once
+   assets/js/components/menubar.js mirrors keyboard highlight onto it
+   -- see that file's header) a keyboard-highlighted-but-not-yet-open
+   trigger during cross-menu ArrowLeft/ArrowRight, both read as solid
+   accent fill -- same visual language `.px-menu-item[data-highlighted]`
+   already uses for rows inside Content. */
+.px-menubar-trigger[data-state="open"],
+.px-menubar-trigger[data-highlighted] {
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.px-menubar-trigger[data-disabled] {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.5;
+}
+
+.px-menubar-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 32rem;
+}
+
+.px-menubar-demo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.px-menubar-demo p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}

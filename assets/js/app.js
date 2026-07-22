@@ -112,3 +112,17 @@ import "components/dropdown_menu";
 // installing "lib/menu" onto Content once at connect time -- same
 // engine Dropdown Menu already proved out.
 import "components/context_menu";
+// <px-menubar> is ui/menubar.pl's (adr/0026): "lib/menu"'s third
+// consumer -- one instance per top-level menu's Content, same as
+// Dropdown Menu -- PLUS "lib/roving-focus" (reused unmodified, same as
+// components/toolbar.js) over the trigger row for top-level
+// ArrowLeft/ArrowRight. This element's own job is purely coordination:
+// hover-switch-to-a-different-menu once ANY menu is already open (one
+// showPopover() call -- native popover light-dismiss auto-closes the
+// previously-open sibling), and bridging ArrowLeft/ArrowRight between
+// "move between top-level triggers" (lib/roving-focus's job) and "move
+// to the adjacent menubar menu from inside an open Content" (yielding
+// to lib/menu.js's own submenu open/close handling via
+// event.defaultPrevented) -- see that file's header for the full
+// mechanism. Neither shared engine is modified for this.
+import "components/menubar";
