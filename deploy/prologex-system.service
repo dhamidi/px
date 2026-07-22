@@ -1,0 +1,31 @@
+# prologex-system.service -- systemd SYSTEM unit variant for the prologex
+# ADR-browser demo. Fallback path; prefer deploy/prologex.service (a user
+# unit) if the VM's session supports `systemctl --user` -- see that file's
+# header comment and adr/0012-deployment-systemd-no-tls.md for details.
+#
+# This file is identical to prologex.service except:
+#   - User=exedev is set (system units need an explicit User=; user units
+#     run as the invoking user implicitly and don't need this).
+#   - WantedBy=multi-user.target instead of default.target (the correct
+#     target for system-level units).
+#
+# Install:
+#
+#   sudo cp deploy/prologex-system.service /etc/systemd/system/prologex.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now prologex.service
+#
+[Unit]
+Description=prologex ADR-browser demo
+After=network.target
+
+[Service]
+Type=simple
+User=exedev
+ExecStart=/home/exedev/prologex/deploy/run.sh
+Restart=on-failure
+RestartSec=2
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

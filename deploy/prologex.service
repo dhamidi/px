@@ -1,0 +1,50 @@
+# prologex.service -- systemd USER unit for the prologex ADR-browser demo.
+#
+# See adr/0012-deployment-systemd-no-tls.md for the full design rationale
+# (plain HTTP on :8080, TLS terminated upstream by the exe.dev proxy).
+#
+# There are two ways to install this unit; pick one.
+#
+# 1) User unit (preferred -- this file, as-is):
+#
+#      mkdir -p ~/.config/systemd/user
+#      cp deploy/prologex.service ~/.config/systemd/user/
+#      systemctl --user daemon-reload
+#      systemctl --user enable --now prologex.service
+#
+#    Requirements:
+#      - The VM's user systemd instance must actually be running; verify
+#        with `systemctl --user status` (it should print manager state,
+#        not error out).
+#      - For the service to survive logout / SSH disconnect, user lingering
+#        must be enabled: `loginctl enable-linger $USER`. This is a common
+#        gotcha -- without it, the user manager (and this service) is
+#        killed when your last session ends.
+#
+# 2) System unit (fallback, if the session doesn't support the above):
+#
+#    Use deploy/prologex-system.service instead of this file -- it is
+#    identical except WantedBy=multi-user.target (not default.target) and
+#    an added User=exedev line, both of which are required for a
+#    system-level unit. Install with:
+#
+#      sudo cp deploy/prologex-system.service /etc/systemd/system/prologex.service
+#      sudo systemctl daemon-reload
+#      sudo systemctl enable --now prologex.service
+#
+[Unit]
+Description=prologex ADR-browser demo
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/exedev/prologex/deploy/run.sh
+Restart=on-failure
+RestartSec=2
+# Default soft nofile limit under systemd --user is 1024 -- nowhere near
+# enough for thousands of concurrent connections, each an open fd. See
+# adr/0015-load-test-10k-connections.md.
+LimitNOFILE=65536
+
+[Install]
+WantedBy=default.target
