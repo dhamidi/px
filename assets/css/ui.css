@@ -1,0 +1,263 @@
+/* px_ui component library styling (adr/0026 rule 6). Appended to,
+   one section per component, keyed off the data-attribute contract
+   documented in docs/radix-port-analysis.md -- the same styling API
+   Radix ships, so Radix-ecosystem CSS knowledge transfers directly.
+   Uses the app theme vars (assets/css/app.css : --bg, --panel, --text,
+   --muted, --accent, --border, ...). */
+
+/* ---------------------------------------------------------------- */
+/* AspectRatio (adr/0026). Platform choice: modern CSS `aspect-ratio` */
+/* replaces Radix's padding-bottom/absolute-inset hack, so there is   */
+/* one div, not two -- see prolog/ui/aspect_ratio.pl's module header  */
+/* for the full rationale. `data-radix-aspect-ratio-wrapper` is kept  */
+/* verbatim as the query/styling hook (it carries no state, hence no  */
+/* [data-state=...] selector here, unlike most other components).    */
+/* ---------------------------------------------------------------- */
+
+[data-radix-aspect-ratio-wrapper] {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+[data-radix-aspect-ratio-wrapper] > * {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+[data-radix-aspect-ratio-wrapper] img,
+[data-radix-aspect-ratio-wrapper] video {
+  object-fit: cover;
+}
+
+/* Demo-only scaffolding (px_ui:demo(aspect_ratio, ...)). */
+
+.aspect-ratio-demo {
+  display: grid;
+  gap: 2rem;
+  max-width: 28rem;
+}
+
+.aspect-ratio-demo h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-family: "SF Mono", Consolas, Menlo, monospace;
+}
+
+.aspect-ratio-swatch {
+  background: linear-gradient(135deg, var(--accent), var(--border));
+}
+
+/* ---------------------------------------------------------------- */
+/* Separator (adr/0026). STATIC: [data-orientation] always;          */
+/* [role="separator"] plus [aria-orientation="vertical"] (vertical    */
+/* only -- horizontal is the ARIA default) unless decorative, in     */
+/* which case [role="none"] only -- see prolog/ui/separator.pl's     */
+/* module header for the full contract. `.px-separator` is this      */
+/* port's own default styling hook, additive to (not part of) that   */
+/* ARIA/data contract: Radix itself ships no default class, but a    */
+/* server-rendered library needs *something* tasteful out of the box */
+/* (adr/0026 rule 6).                                                */
+/* ---------------------------------------------------------------- */
+
+.px-separator {
+  flex-shrink: 0;
+  background: var(--border);
+  border: none;
+}
+
+.px-separator[data-orientation="horizontal"] {
+  width: 100%;
+  height: 1px;
+  margin: 1.25rem 0;
+}
+
+.px-separator[data-orientation="vertical"] {
+  width: 1px;
+  height: 1.25rem;
+  margin: 0 0.75rem;
+}
+
+/* Demo-only scaffolding (px_ui:demo(separator, ...)). */
+
+.ui-demo-block {
+  margin-bottom: 2rem;
+}
+
+.ui-demo-block h3 {
+  margin-bottom: 0.4rem;
+}
+
+.ui-demo-block p {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.ui-demo-row {
+  display: flex;
+  align-items: center;
+}
+
+/* ---------------------------------------------------------------- */
+/* VisuallyHidden (adr/0026). STATIC: no data-state, no role/aria-*   */
+/* -- the class itself is the styling hook. The standard sr-only      */
+/* clip-rect technique: content stays in the DOM and the              */
+/* accessibility tree, removed only from visual layout -- see         */
+/* prolog/ui/visually_hidden.pl's module header for the full          */
+/* rationale (and why this is a class, not Radix's inline style).     */
+/* ---------------------------------------------------------------- */
+
+.px-visually-hidden {
+  position: absolute;
+  border: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  word-wrap: normal;
+}
+
+/* ---------------------------------------------------------------- */
+/* AccessibleIcon (adr/0026). STATIC, no styling contract of its own  */
+/* -- it's an aria-hidden icon wrapper plus a .px-visually-hidden     */
+/* label (above); see prolog/ui/accessible_icon.pl's module header.   */
+/* .px-icon-button below is demo-only scaffolding shared by the       */
+/* visually_hidden and accessible_icon demo pages (the "icon button   */
+/* with a hidden accessible name" pattern both demos build).          */
+/* ---------------------------------------------------------------- */
+
+.px-icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent);
+  color: #0f1115;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.px-icon-button:hover {
+  filter: brightness(1.12);
+}
+
+.px-icon-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.35);
+}
+
+.px-icon-button svg {
+  display: block;
+}
+
+/* ---------------------------------------------------------------- */
+/* Progress (adr/0026). STATIC: [role="progressbar"] on Root plus     */
+/* aria-valuemax/valuemin/valuenow/valuetext and a                    */
+/* data-state=indeterminate|complete|loading / data-value / data-max  */
+/* triplet mirrored onto the Indicator -- see prolog/ui/progress.pl's */
+/* module header for the full contract. Root (.px-progress) is the   */
+/* track; Indicator (.px-progress-indicator) is the accent fill.      */
+/* Determinate width is set server-side as an inline style            */
+/* (progress.pl computes the percentage at render time, since there   */
+/* is no client JS here to do it); the indeterminate state has no     */
+/* known width, so [data-state="indeterminate"] instead drives a      */
+/* pure-CSS sweep animation -- no JS, no polling, matching upstream   */
+/* Radix's own "the primitive never animates itself" contract.       */
+/* ---------------------------------------------------------------- */
+
+.px-progress {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 0.6rem;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.px-progress-indicator {
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width 0.3s ease;
+}
+
+/* Determinate states (loading/complete) get their width from the
+   inline `style="width: N%;"` progress.pl already writes -- nothing
+   extra needed here beyond the transition above. */
+
+.px-progress-indicator[data-state="indeterminate"] {
+  width: 40%;
+  animation: px-progress-indeterminate 1.2s ease-in-out infinite;
+}
+
+@keyframes px-progress-indeterminate {
+  0%   { transform: translateX(-150%); }
+  100% { transform: translateX(350%); }
+}
+
+/* Demo layout (px_ui:demo(progress, ...), /ui/progress). */
+
+.px-progress-demo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 24rem;
+}
+
+.px-progress-row p {
+  margin: 0 0 0.4rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ---------------------------------------------------------------- */
+/* Label (adr/0026). STATIC, no data-state: `.px-label` on the       */
+/* native <label> is the only hook -- see prolog/ui/label.pl's       */
+/* module header for the full contract. This is also where Radix's   */
+/* JS-only double/triple-click-selection guard is replaced with CSS  */
+/* per the analysis doc's own recommendation: `user-select: none` on */
+/* the label, re-enabled on nested controls so text *inside* a       */
+/* label-wrapped control (the implicit for-less association pattern) */
+/* still selects normally.                                           */
+/* ---------------------------------------------------------------- */
+
+.px-label {
+  display: inline-block;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.4;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.px-label :where(input, textarea, select, button) {
+  cursor: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Demo layout (px_ui:demo(label, ...), /ui/label). */
+
+.ui-demo-label p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  max-width: 32rem;
+}
+
+.ui-demo-label .field {
+  max-width: 20rem;
+}
