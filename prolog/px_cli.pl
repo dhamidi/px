@@ -486,6 +486,27 @@ article.card {
 
 .empty { color: var(--muted); }
 .actions { display: flex; gap: 0.75rem; align-items: center; }
+
+/* button_to: a single button that IS a form -- no panel, inline. */
+form.button-to {
+  display: inline;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+}
+form.button-to button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--danger);
+  font-weight: 500;
+  padding: 0.35rem 0.9rem;
+}
+form.button-to button:hover {
+  background: var(--panel);
+  border-color: var(--danger);
+}
 ".
 
 tpl_app_js(_, _, C) :-
@@ -829,7 +850,8 @@ reason.
 {{show_lines}}
         div(class(actions),
           [ link_to("Edit", edit_{{sing}}_path(M.{{sing}}.id)),
-            \\form_for(destroy_{{sing}}, delete({{sing}}_path(M.{{sing}}.id)), _{}, [])
+            button_to("Delete {{sing}}", destroy_{{sing}},
+                      delete({{sing}}_path(M.{{sing}}.id)))
           ])
       ]).
 

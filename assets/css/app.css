@@ -281,13 +281,35 @@ input[type="submit"]:hover {
 /* Full-width, comfortably tappable submit on narrow screens
    (adr/0028 decisions 2 and 3). */
 @media (max-width: 480px) {
-  form button,
-  form input[type="submit"],
-  button[type="submit"],
-  input[type="submit"] {
+  form:not(.button-to) button,
+  form:not(.button-to) input[type="submit"] {
     width: 100%;
     padding: 0.8rem 1.5rem;
   }
+}
+
+/* button_to: a single button that IS a form -- no panel, no
+   spacing; it sits inline next to links. */
+form.button-to {
+  display: inline;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+form.button-to button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--danger);
+  font-weight: 500;
+  padding: 0.35rem 0.9rem;
+}
+
+form.button-to button:hover {
+  background: var(--panel);
+  border-color: var(--danger);
 }
 
 form button:focus-visible,

@@ -331,6 +331,8 @@ px_template:render_helper(form_for(FormName, Action, Values, Errors), S) :-
     px_form:render_form_for(FormName, Action, Values, Errors, S).
 px_template:render_helper(field_input(FormName, FieldName, Values, Errors), S) :-
     px_form:render_field_input(FormName, FieldName, Values, Errors, S).
+px_template:render_helper(button_to(Label, MsgName, Action), S) :-
+    px_form:render_button_to(Label, MsgName, Action, S).
 
 %!  render_form_for(+FormName, +ActionTerm, +Values, +Errors, +S)
 %
@@ -350,9 +352,12 @@ render_form_for(FormName, ActionTerm, Values, Errors, S) :-
             FieldEls),
     %   The form's name is its message name (adr/0027 decision 3):
     %   px_page's default decoder reads it back from params._msg.
+    %   The submit label is the humanized form name -- create_article
+    %   renders "Create article", never a generic "Submit".
     MsgInput = input([type(hidden), name('_msg'), value(FormName)]),
+    humanize(FormName, SubmitLabel),
     append([[MsgInput], OverrideEls, FieldEls,
-            [button(type(submit), "Submit")]],
+            [button(type(submit), SubmitLabel)]],
            Children),
     px_template:render(S,
                        form([action(ActionPath), method(post)], Children)).
@@ -376,6 +381,28 @@ resolve_action(PathTerm, Path) :-
                     context(px_form:form_for/4,
                             'no px_env:eval_path_term/2 clause applies and the term is not a literal path')))
     ).
+
+%!  render_button_to(+Label, +MsgName, +ActionTerm, +S)
+%
+%   Rails' button_to: a single button that IS a form -- for actions
+%   that carry no data beyond their intent (delete this, archive
+%   that). Renders an inline form.button-to holding only the hidden
+%   `_msg` (naming the message; a fieldless `:- form(MsgName, [])`
+%   receives it validated as MsgName(ok(_))), the `_method` override
+%   when the action term asks for one, and the labelled button. The
+%   button-to class strips the panel styling a real form gets, so
+%   this sits inline next to links.
+
+render_button_to(Label, MsgName, ActionTerm, S) :-
+    action_method(ActionTerm, PathTerm, OverrideEls),
+    resolve_action(PathTerm, ActionPath),
+    MsgInput = input([type(hidden), name('_msg'), value(MsgName)]),
+    append([[MsgInput], OverrideEls, [button(type(submit), Label)]],
+           Children),
+    px_template:render(S,
+                       form([class("button-to"), action(ActionPath),
+                             method(post)],
+                            Children)).
 
 %!  render_field_input(+FormName, +FieldName, +Values, +Errors, +S)
 %

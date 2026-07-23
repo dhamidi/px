@@ -285,7 +285,7 @@ test(form_for_rendering) :-
     expect_sub(Html, "<input type=\"password\" name=\"secret\" id=\"gadget_form_secret\">"),
     expect_no_sub(Html, "hunter2"),
     % submit button closes the form
-    expect_sub(Html, "<button type=\"submit\">Submit</button></form>").
+    expect_sub(Html, "<button type=\"submit\">Gadget form</button></form>").  % label = humanized form name
 
 %   Bare (non-wrapped) action term: no override input; empty values
 %   render no value attributes.
