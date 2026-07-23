@@ -57,6 +57,8 @@ NOAUTH=$(curl -s --max-time 6 -o /dev/null -w "%{http_code}" -d "goal=true" "htt
 # The standalone console PAGE (GET) -- browsable, not just on errors.
 PAGE=$(curl -s --max-time 6 "http://localhost:$DEV_PORT/__px/console")
 echo "$PAGE" | grep -q "Development console" && ok "dev GET /__px/console renders the console page" || bad "dev console page missing"
+echo "$PAGE" | grep -q "pxc-data" && ok "console embeds discovery data (chips + help)" || bad "no pxc-data payload"
+echo "$PAGE" | grep -qE "posts_commands|posts_model" && ok "discovery lists the app's own predicates" || bad "app predicates not discovered"
 PTOK=$(echo "$PAGE" | grep -oE 'token="[a-f0-9]+"' | grep -oE '[a-f0-9]{16,}' | head -1)
 PEVAL=$(curl -s --max-time 6 -d "token=$PTOK&goal=X is 21 %2B 21" "http://localhost:$DEV_PORT/__px/console")
 echo "$PEVAL" | grep -q "42" && ok "the page's own token evaluates a goal" || bad "console page eval: $PEVAL"

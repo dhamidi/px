@@ -75,7 +75,14 @@ only by `enable_dev_console/0`, so in production a `GET` or `POST` to
 The REPL is a `<px-console>` custom element — a terminal-style
 scrollback with command history (`↑`/`↓`), multi-line input
 (`Shift+Enter`), and `clear` — self-contained in the console page (no
-build step, no app asset pipeline). It POSTs a goal and renders the
+build step, no app asset pipeline). It is **discoverable**: the
+framework API (`row/2`, `config/2`, `field/3`, `param/3`) is imported
+into `user` so it works unqualified in the REPL, and the page hands
+the element the app's own exported predicates (introspected from the
+modules under `app/`) plus a few safe example goals. A `help` command
+(and chip) lists all three — framework API, your app's predicates
+(tap to insert), example goals (tap to run) — so a first-time user is
+never staring at a blank prompt with no idea what to type. It POSTs a goal and renders the
 JSON reply: bindings as `Name = Value`, then `true.`/`false.`, output
 before the result, errors in red. The eval endpoint reads a goal
 string, evaluates it once **in module `user`** (so unqualified goals
