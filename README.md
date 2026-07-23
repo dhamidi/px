@@ -83,8 +83,10 @@ build automatically on the first command that needs them:
 # macOS:  brew install swi-prolog libuv
 # Debian: apt install swi-prolog-nox libuv1-dev build-essential
 
-git clone https://github.com/dhamidi/px && px/bin/px new myapp
-cd myapp && bin/px server
+git clone https://github.com/dhamidi/px
+px/bin/px install                 # px on your PATH (~/.local/bin, no sudo)
+px new myapp
+cd myapp && px server
 ```
 
 ## Running this repo's demo app

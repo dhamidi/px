@@ -6,12 +6,44 @@
 # (adr/0034): apps load the framework SOURCE at runtime, so a
 # standalone px could not carry what they need. A fresh clone
 # bootstraps itself -- the C bindings build on the first command that
-# needs them.
+# needs them -- and `px install [DIR]` puts a shim on your PATH.
 #
 # Framework home is this script's own tree; PX_HOME overrides.
 set -euo pipefail
 
-PX_HOME="${PX_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# Resolve symlinks so `ln -s .../bin/px ~/bin/px` also finds home.
+SELF="${BASH_SOURCE[0]}"
+while [ -h "$SELF" ]; do
+    DIR="$(cd -P "$(dirname "$SELF")" && pwd)"
+    SELF="$(readlink "$SELF")"
+    [[ $SELF != /* ]] && SELF="$DIR/$SELF"
+done
+PX_HOME="${PX_HOME:-$(cd -P "$(dirname "$SELF")/.." && pwd)}"
+
+# `px install [DIR]` -- write a PATH shim with the home baked in
+# (the scaffold-shim pattern; a symlink would work too, but a shim
+# survives the checkout moving only one edit away and needs no
+# readlink portability). Default DIR: ~/.local/bin. Needs no swipl.
+if [ "${1:-}" = "install" ]; then
+    DEST_DIR="${2:-$HOME/.local/bin}"
+    mkdir -p "$DEST_DIR"
+    DEST="$DEST_DIR/px"
+    cat > "$DEST" <<EOF
+#!/usr/bin/env bash
+# Installed by \`px install\` -- the framework checkout it runs from:
+set -euo pipefail
+export PX_HOME="\${PX_HOME:-$PX_HOME}"
+exec "\$PX_HOME/bin/px" "\$@"
+EOF
+    chmod +x "$DEST"
+    echo "px: installed $DEST -> $PX_HOME"
+    case ":$PATH:" in
+        *":$DEST_DIR:"*) ;;
+        *) echo "px: note -- $DEST_DIR is not on your PATH; add:" >&2
+           echo "     export PATH=\"$DEST_DIR:\$PATH\"" >&2 ;;
+    esac
+    exit 0
+fi
 
 if ! command -v swipl >/dev/null 2>&1; then
     echo "px: SWI-Prolog is required." >&2

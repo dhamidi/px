@@ -66,6 +66,7 @@ main(Argv) :-
 
 usage :-
     format("px -- the prologex command line (adr/0032)~n~n"),
+    format("  px install [DIR]           put px on your PATH (default ~~/.local/bin)~n"),
     format("  px new APP                 scaffold a new application~n"),
     format("  px generate feature NAME   scaffold app/NAME/ (alias: g)~n"),
     format("  px routes                  print the route table~n"),

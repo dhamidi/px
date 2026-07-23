@@ -34,10 +34,19 @@ Instead, the clone bootstraps itself:
    default paths suffice (Debian). Compilation and linking go
    through `swipl-ld`, which owns the platform specifics.
 
+4. **`px install [DIR]`** (default `~/.local/bin`, never sudo) puts
+   px on the PATH -- not a symlink but a two-line shim with the
+   framework home baked in, the same pattern scaffolded apps' `bin/`
+   uses: it needs no `readlink -f` portability and survives with one
+   visible edit if the checkout ever moves. `bin/px` also resolves
+   symlinks to itself, so a hand-made `ln -s` works too. The shim is
+   written by bash alone, so `install` works before swipl does.
+
 So the whole getting-started is:
 
-    git clone https://github.com/dhamidi/px && px/bin/px new myapp
-    cd myapp && bin/px server        # C bindings build here, once
+    git clone https://github.com/dhamidi/px
+    px/bin/px install                # once: px on the PATH
+    px new myapp && cd myapp && px server   # C bindings build here, once
 
 ## Consequences
 
