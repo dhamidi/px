@@ -19,13 +19,25 @@ forms that validate and re-render themselves, config as a Prolog
 file, and Hotwire/Turbo (frames, streams, progressive enhancement)
 out of the box.
 
-The proof of the framework is a real app: `apps/adr_site.pl` serves
-this project's own [architecture decision log](adr/) — markdown files
+Applications are structured by convention on the Elm Architecture
+rather than MVC (adr/0027): each page is a module giving `model/2`
+(build everything the page needs; failure is the 404), `view/2`
+(pure, Model in, template term out) and — for pages that accept
+messages — `update/4`, a relation from a decoded message and model
+to a new model plus *effects as data* (redirect, turbo streams,
+status), Elm's `Cmd` on the response side. A `:- page(Path)`
+directive wires routes, message dispatch, and a reversible path
+helper; there is no application "main" file at all — `bin/server`
+boots whatever `app/` and `config/` contain.
+
+The proof of the framework is a real app: `app/` serves this
+project's own [architecture decision log](adr/) — markdown files
 parsed by a hand-written DCG markdown engine, rendered to HTML, and
 served over the framework's own router — plus a sqlite-backed
 guestbook exercising forms, the query builder, and Turbo streams.
-Start reading at `adr/0016-rails-layer-syntax-north-star.md` for the
-application surface, or `apps/adr_site.pl` to see it used.
+Start reading at `adr/0016-rails-layer-syntax-north-star.md` and
+`adr/0027-app-structure-elm-architecture.md` for the application
+surface, or `app/pages/guestbook.pl` to see it used.
 
 ## Why it's built the way it is
 
@@ -41,12 +53,17 @@ for the map of the rest.
 
 ```
 adr/              one markdown file per decision (also the content the demo app serves)
-vendor/llhttp/    vendored amalgamated llhttp C sources (adr/0003)
-c/                1:1 C FFI: llhttp_swi.c, uv_swi.c, http_stream_swi.c (adr/0002)
-prolog/           the framework: worker.pl, http_stream.pl, router.pl,
-                   middleware.pl, response.pl, app.pl, markdown/
-apps/             the demo app (adr_site.pl) + static assets
-deploy/           systemd unit + run script (adr/0012)
+vendor/           vendored amalgamated llhttp + sqlite C sources (adr/0003, adr/0020)
+c/                1:1 C FFI: llhttp_swi.c, uv_swi.c, http_stream_swi.c, sqlite3_swi.c
+prolog/           the framework: the transport core, the Rails layer (px_*.pl),
+                   the TEA page runtime (px_page.pl), px_ui + prolog/ui/, markdown/
+app/              the demo app, in the adr/0027 standard layout:
+  pages/           one Elm-Architecture page per file (model/update/view)
+  views/           shared templates (layout.pl)
+  lib/             plain domain relations (adrs.pl)
+assets/           css/ + js/ sources for the pipeline (adr/0025)
+config/           app.pl — port, workers, database (adr/0022)
+bin/server        boots the app by convention; deploy/ wraps it for systemd
 test/             milestone proofs for each layer, run for real, not just written
 ```
 
@@ -54,7 +71,7 @@ test/             milestone proofs for each layer, run for real, not just writte
 
 ```sh
 cd c && make
-cd .. && swipl apps/adr_site.pl 8090
+cd .. && bin/server
 ```
 
 Or as a systemd user service — see `deploy/prologex.service` for the

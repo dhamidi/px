@@ -31,14 +31,18 @@ global term_expansion. On top of that it provides:
         database opens -- the app's schema rides with the app.
 
     prologex_run/0
-        The entry point of the north-star example's
-        `:- initialization(prologex_run)`: load config/app.pl (cwd
-        relative; deploy/run.sh cds to the repo root), install the
-        default pipeline when the app declared none, compile the
-        asset pipeline (px_assets:compile_assets/0, adr/0025 --
-        idempotent and cheap, so it is safe to run on every start),
-        ensure the database directory exists, start the workers,
-        block forever.
+        The whole boot (adr/0016, adr/0027). Started in an app
+        directory (bin/server cds there) it needs no app "main" file:
+        load config/app.pl, register the lib/views/pages search-path
+        aliases, mount /assets/:file, load every module under
+        app/lib, app/views and app/pages (in that order -- `:- page`
+        directives register their routes as they load), install the
+        default pipeline when the app declared none, install the
+        default mobile-first layout when the app defined no layout/2
+        template (px_page:ensure_layout/0), compile the asset
+        pipeline (px_assets:compile_assets/0, adr/0025 -- idempotent
+        and cheap, so it is safe to run on every start), ensure the
+        database directory exists, start the workers, block forever.
 
 Default pipeline (when the app has no `:- pipeline(...)`):
 
@@ -62,6 +66,15 @@ statements, and installs the connection via px_query:use_db/1
 :- use_module(library(lists)).
 :- use_module(library(filesex)).
 
+%   Make `:- use_module(library(prologex))` -- the adr/0016 example's
+%   own first line -- work for app code (adr/0027): the framework's
+%   prolog/ directory joins the library search path.
+:- prolog_load_context(directory, Dir),
+   (   user:file_search_path(library, Dir)
+   ->  true
+   ;   assertz(user:file_search_path(library, Dir))
+   ).
+
 :- prolog_load_context(directory, Dir),
    atomic_list_concat([Dir, '/px_env'],      EnvSpec),
    atomic_list_concat([Dir, '/px_query'],    QuerySpec),
@@ -72,6 +85,8 @@ statements, and installs the connection via px_query:use_db/1
    atomic_list_concat([Dir, '/px_router'],   RouterSpec),
    atomic_list_concat([Dir, '/px_assets'],   AssetsSpec),
    atomic_list_concat([Dir, '/px_db'],       DbSpec),
+   atomic_list_concat([Dir, '/px_page'],     PageSpec),
+   atomic_list_concat([Dir, '/px_ui'],       UiSpec),
    atomic_list_concat([Dir, '/worker'],      WorkerSpec),
    atomic_list_concat([Dir, '/http_stream'], StreamSpec),
    reexport(EnvSpec,      [respond/3, respond/4, redirect/3, not_found/2]),
@@ -83,6 +98,8 @@ statements, and installs the connection via px_query:use_db/1
    reexport(AssetsSpec,   [asset_path/2, serve_asset/2]),
    use_module(RouterSpec, []),         % directives are global term_expansion
    use_module(DbSpec,     []),
+   use_module(PageSpec,   []),         % :- page directive (adr/0027)
+   use_module(UiSpec,     []),         % component library is framework surface
    use_module(WorkerSpec, []),
    use_module(StreamSpec, []).
 
@@ -144,7 +161,11 @@ add_schema(SQL) :-
 
 prologex_run :-
     load_app_config,
+    ensure_app_paths,
+    mount_assets_route,
+    load_app_tree,
     ensure_pipeline,
+    px_page:ensure_layout,
     px_assets:compile_assets,
     app_port(Port),
     app_workers(Workers),
@@ -161,6 +182,44 @@ load_app_config :-
     ->  px_config:load_config('config/app.pl')
     ;   true
     ).
+
+%   The adr/0027 conventions. ensure_app_paths makes
+%   `:- use_module(lib(adrs))` etc. resolve inside app modules;
+%   load_app_tree loads the standard directories in dependency order
+%   (lib before views before pages -- pages import the others);
+%   mount_assets_route serves the pipeline without the app writing a
+%   route for it. All three are no-ops for whatever the app directory
+%   does not contain.
+
+ensure_app_paths :-
+    forall(member(Alias-Rel, [lib-'app/lib', views-'app/views', pages-'app/pages']),
+           (   exists_directory(Rel)
+           ->  absolute_file_name(Rel, Abs),
+               (   user:file_search_path(Alias, Abs)
+               ->  true
+               ;   assertz(user:file_search_path(Alias, Abs))
+               )
+           ;   true
+           )).
+
+load_app_tree :-
+    forall(member(Dir, ['app/lib', 'app/views', 'app/pages']),
+           load_dir_modules(Dir)).
+
+load_dir_modules(Dir) :-
+    (   exists_directory(Dir)
+    ->  directory_files(Dir, Files),
+        msort(Files, Sorted),
+        forall(( member(F, Sorted), file_name_extension(_, pl, F) ),
+               ( directory_file_path(Dir, F, Path),
+                 use_module(user:Path)
+               ))
+    ;   true
+    ).
+
+mount_assets_route :-
+    router:add_route(px_assets_file, get, "/assets/:file",
+                     px_assets:serve_asset).
 
 app_port(Port) :-
     (   px_config:config(port, P) -> Port = P ; Port = 8090 ).

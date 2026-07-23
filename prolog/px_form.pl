@@ -348,7 +348,11 @@ render_form_for(FormName, ActionTerm, Values, Errors, S) :-
               field_element(FormName, Module, Field, Values, Errors, El)
             ),
             FieldEls),
-    append([OverrideEls, FieldEls, [button(type(submit), "Submit")]],
+    %   The form's name is its message name (adr/0027 decision 3):
+    %   px_page's default decoder reads it back from params._msg.
+    MsgInput = input([type(hidden), name('_msg'), value(FormName)]),
+    append([[MsgInput], OverrideEls, FieldEls,
+            [button(type(submit), "Submit")]],
            Children),
     px_template:render(S,
                        form([action(ActionPath), method(post)], Children)).

@@ -73,7 +73,11 @@ runs standalone):
       always a literal, by contract (see write_attr_value/2 below).
 */
 
+%   dynamic as well as multifile: px_page:ensure_layout/0 (adr/0027
+%   decision 5) asserts the default-layout clause at boot when the
+%   loaded app defined no layout/2 template of its own.
 :- multifile tmpl/2.
+:- dynamic   tmpl/2.
 :- multifile render_helper/2.
 :- dynamic   render_helper/2.
 :- multifile eval_attr_value/2.

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#
+# bin/server -- boot the app (adr/0027): cd to the app root and run
+# prologex_run/0, which loads config/ and app/ by convention. Dev and
+# production use the same entry; port/workers/database come from
+# config/app.pl (adr/0022), not argv.
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+exec swipl -g prologex_run prolog/prologex.pl

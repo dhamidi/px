@@ -45,6 +45,13 @@ RestartSec=2
 # enough for thousands of concurrent connections, each an open fd. See
 # adr/0015-load-test-10k-connections.md.
 LimitNOFILE=65536
+# swipl installs no SIGTERM handler, so the default stop sequence stalls
+# for the full 90s TimeoutStopSec before systemd escalates. Until graceful
+# shutdown is wired (bridge:shutdown_all_workers exists but is unbound to
+# any signal), kill outright: the app is stateless between requests and
+# sqlite recovers via its journal.
+KillSignal=SIGKILL
+TimeoutStopSec=5
 
 [Install]
 WantedBy=default.target

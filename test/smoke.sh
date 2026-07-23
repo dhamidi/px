@@ -14,7 +14,7 @@
 # Prints PASS/FAIL per check and exits 0 only if every applicable check
 # passed.
 #
-# NOTE on the /adr/... path check below: the demo app (apps/adr_site.pl)
+# NOTE on the /adr/... path check below: the demo app (app/, adr/0027)
 # did not exist yet when this script was written, so the exact URL shape
 # for an individual ADR page is a guess based on the ADR filename
 # convention (adr/0001-project-goals-and-layout.md). If the real router
@@ -88,7 +88,7 @@ fi
 # adr/0007 and adr/0008 are about the server's ability to stream request
 # and response bodies (and apply backpressure) rather than buffering
 # everything up front. A real check for that needs an endpoint that
-# accepts a request body -- but apps/adr_site.pl, per its stated purpose,
+# accepts a request body -- but the ADR browser, per its stated purpose,
 # is a read-only markdown browser with no such endpoint. Rather than
 # invent a body-accepting request against an app that has nowhere to send
 # one (which would just exercise 404/405 handling, not streaming), this
