@@ -58,7 +58,7 @@ defined no layout/2 template.
 :- use_module(px_template).
 :- use_module(px_env, [respond/3, respond/4, redirect/3, redirect/4,
                        not_found/2, param/3, params/2,
-                       env_get/3, put_env/4]).
+                       env_get/3, put_env/4, breadcrumb/1]).
 :- use_module(px_form, [form_result/3]).
 :- use_module(px_turbo, [turbo_or_redirect/4, turbo_stream/3]).
 :- use_module(px_assets, []).
@@ -196,11 +196,13 @@ prolog:message(px_controller(missing(M, PI))) -->
 %   the 404 (adr/0027 decision 2).
 
 serve_get(M, Action, Env0, Env) :-
+    breadcrumb(handler(M, Action)),           % dev-only trace (adr/0038)
     (   authorized(M, Action, Env0)
     ->  (   M:model(Action, Env0, Model)
         ->  M:view(Action, Model, Html),
             respond(Env0, Html, Env)
-        ;   not_found(Env0, Env)
+        ;   breadcrumb(model_failed(M, Action)),
+            not_found(Env0, Env)
         )
     ;   deny(Env0, Env)
     ).
@@ -212,13 +214,15 @@ serve_get(M, Action, Env0, Env) :-
 %   clause) is a 404, same as a failing model on GET.
 
 serve_msg(M, Action, Env0, Env) :-
+    breadcrumb(handler(M, Action)),           % dev-only trace (adr/0038)
     (   current_predicate(M:update/4),
         decode_msg(M, Env0, Msg)
     ->  (   authorized(M, Msg, Env0)
         ->  (   M:model(Action, Env0, Model0),
                 M:update(Msg, Model0, Model, Effects)
             ->  run_effects(Effects, M, Action, Model, Env0, Env)
-            ;   not_found(Env0, Env)
+            ;   breadcrumb(model_failed(M, Action)),
+                not_found(Env0, Env)
             )
         ;   deny(Env0, Env)
         )

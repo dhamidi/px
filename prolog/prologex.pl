@@ -93,6 +93,7 @@ statements, and installs the connection via px_query:use_db/1
 :- use_module(px_controller, []).   % :- page directive (adr/0027, adr/0029)
 :- use_module(px_ui,         []).   % component library is framework surface
 :- use_module(px_reload,     []).   % dev-mode hot reload (adr/0036)
+:- use_module(px_console,    []).   % dev-mode console + error page (adr/0038)
 :- use_module(worker,        []).
 :- use_module(http_stream,   []).
 
@@ -180,9 +181,26 @@ prologex_load :-
     %   check has a boot-time reference point (see px_reload.pl's
     %   module doc for why that matters).
     (   px_config:current_env(development)
-    ->  px_reload:record_boot_state
+    ->  px_reload:record_boot_state,
+        enable_dev_console            % adr/0038, development only
     ;   px_assets:compile_assets
     ).
+
+%!  enable_dev_console is det.
+%
+%   adr/0038: in development ONLY, turn on request breadcrumbs + the
+%   rich error page, generate the per-boot console token, and mount
+%   the REPL endpoint as a route. In production none of this runs, so
+%   the console route is not in the route table at all (a request to
+%   it is an ordinary 404 -- no feature, no attack surface), and a
+%   px build binary (loaded under PROLOGEX_ENV=production) contains no
+%   console route. This is the single boundary the whole feature's
+%   safety rests on, so it lives here in the boot, gated once.
+enable_dev_console :-
+    px_env:set_dev_diagnostics(true),
+    px_console:init_console,
+    router:add_route(px_console_eval, post, "/__px/console",
+                     px_console:console_eval).
 
 prologex_serve :-
     app_port(Port),

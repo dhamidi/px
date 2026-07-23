@@ -19,6 +19,10 @@
             not_found/2,          % +Env0, -Env
             set_pipeline/1,       % +Goals
             dispatch_env/2,       % +Env0, -Env
+            set_dev_diagnostics/1,% +Bool  (boot fact, adr/0038)
+            breadcrumb/1,         % +Term  (dev-only request trace)
+            breadcrumb_reset/0,   %        (dev-only)
+            request_trace/1,      % -Terms (dev-only, in order)
             handle_request/3,     % +Request, +Stream, +WorkerId
             write_response/2,     % +Stream, +Env
             eval_path_term/2      % multifile hook: +PathTerm, -PathString
@@ -297,10 +301,58 @@ set_pipeline(Goals) :-
 %   becomes a 500.
 dispatch_env(Env0, Env) :-
     (   pipeline_goals(Goals) -> true ; Goals = [] ),
-    catch(run_pipeline(Goals, Env0, Env1),
+    breadcrumb_reset,
+    catch(( run_pipeline(Goals, Env0, Env1), Diag = ok ),
           Error,
-          error_env(Env0, Error, Env1)),
-    finalize_env(Env1, Env).
+          ( error_env(Env0, Error, Env1), Diag = error(Error) )),
+    finalize_env(Env1, Env2),
+    dev_error_page(Env0, Diag, Env2, Env).
+
+%   Development diagnostics (adr/0038): gated on a boot-time fact, so
+%   production (and every px build binary, which loads under
+%   PROLOGEX_ENV=production) is byte-identical to before -- the hook
+%   below has no clause and the breadcrumb primitives are inert.
+:- dynamic dev_diagnostics/0.
+
+set_dev_diagnostics(true)  :- !, ( dev_diagnostics -> true ; assertz(dev_diagnostics) ).
+set_dev_diagnostics(false) :- retractall(dev_diagnostics).
+
+%   dev_error_render(+Env0, +Diag, +Status, -Body): the multifile hook
+%   px_console fills in (only in development). It turns a terse 404/500
+%   into the rich diagnostic page body term. No clause in production =>
+%   the terse body stands.
+:- multifile dev_error_render/4.
+
+dev_error_page(Env0, Diag, Env2, Env) :-
+    (   dev_diagnostics,
+        env_get(Env2, response, response(Status, Headers, _)),
+        memberchk(Status, [404, 500]),
+        catch(dev_error_render(Env0, Diag, Status, Body), _, fail)
+    ->  put_env(Env2, response, response(Status, Headers, Body), Env)
+    ;   Env = Env2
+    ).
+
+%   Per-request breadcrumb trace, thread-local, dev only. The router
+%   and controller append what stage they reached so the error page
+%   can say precisely where a request died (adr/0038 decision 4). In
+%   production dev_diagnostics is unset, so every call is a no-op with
+%   no allocation.
+:- thread_local req_trace/1.
+
+breadcrumb(Term) :-
+    (   dev_diagnostics
+    ->  assertz(req_trace(Term))
+    ;   true
+    ).
+
+breadcrumb_reset :-
+    (   dev_diagnostics
+    ->  retractall(req_trace(_))
+    ;   true
+    ).
+
+request_trace(Terms) :-
+    findall(T, req_trace(T), Terms).
 
 run_pipeline([], Env, Env).
 run_pipeline([Step|Steps], Env0, Env) :-
