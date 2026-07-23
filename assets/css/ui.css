@@ -4234,3 +4234,201 @@ px-select:defined .px-select-trigger {
 .px-select-demo-submit:hover {
   background: var(--accent-hover);
 }
+
+/* ---------------------------------------------------------------- */
+/* Mobile baseline (adr/0028), decisions 3 and 4 -- applies across    */
+/* every component section above rather than living inside any one    */
+/* of them, the same way this library's shared theme vars do.         */
+/*                                                                     */
+/* Decision 3: a `@media (pointer: coarse)` block raises the           */
+/* *effective* touch-target size of every interactive row/control to  */
+/* >= 44 CSS px (Apple's HIG floor) WITHOUT inflating the desktop       */
+/* (pointer: fine) design above -- these rules are additive-only and   */
+/* never touched by a fine pointer. Two techniques, chosen per         */
+/* component shape: (a) row-shaped controls (menu items, tab/trigger   */
+/* buttons, disclosure headers) simply get a `min-height`, which grows */
+/* the row -- exactly Radix Themes' own size-3-on-touch behavior; (b)  */
+/* small fixed-glyph controls (Checkbox, Switch, Radio Group) instead  */
+/* grow the *label*'s hit area while the painted glyph inside stays    */
+/* pinned to its original, centered size, so the visual design is      */
+/* identical to desktop and only the invisible tappable region grows.  */
+/*                                                                     */
+/* Decision 4: a `@media (max-width: 480px)` block clamps every        */
+/* overlay's content to the viewport minus a small inset instead of a  */
+/* fixed/oversized width, so it degrades to a sheet rather than a      */
+/* scaled-down floating card, and never fights lib/popper.js's own     */
+/* boundary-padding clamping with a wider fixed box.                   */
+/* ---------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+  /* Menu rows: Dropdown/Context/Menubar Menu items and Select's        */
+  /* listbox rows all share (or mirror) this one row treatment. */
+  .px-menu-item,
+  .px-select-item {
+    min-height: 44px;
+  }
+
+  /* Tab triggers. */
+  .px-tabs-trigger {
+    min-height: 44px;
+  }
+
+  /* Disclosure triggers: Accordion header row, Collapsible trigger. */
+  .px-accordion-header,
+  .px-collapsible-trigger {
+    min-height: 44px;
+  }
+
+  /* Toolbar buttons. */
+  .px-toolbar-item {
+    min-width: 44px;
+    height: 44px;
+  }
+
+  /* Toggle / Toggle Group buttons. */
+  .px-toggle,
+  .px-toggle-group-item {
+    min-width: 44px;
+    height: 44px;
+  }
+
+  /* Dropdown/Menubar/Navigation Menu triggers: the same row-button      */
+  /* treatment as menu items/tabs above, just a taller box; horizontal   */
+  /* padding and centering are already in place in each section's own   */
+  /* desktop rule, so `min-height` alone is enough here. */
+  .px-dropdown-menu-trigger,
+  .px-menubar-trigger,
+  .px-navigation-menu-trigger {
+    min-height: 44px;
+  }
+
+  /* Navigation Menu "list-link rows" (adr/0028 decision 3's own          */
+  /* wording) -- the vertical-orientation Link rows, plus the flyout's    */
+  /* link-card grid items, both otherwise sized by their text content     */
+  /* alone. */
+  .px-navigation-menu[data-orientation="vertical"] > .px-navigation-menu-list > .px-navigation-menu-item > .px-navigation-menu-link {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
+  .px-navigation-menu-card {
+    min-height: 44px;
+  }
+
+  /* Checkbox: `.px-checkbox` IS the `<label>` wrapping the real         */
+  /* `<input>` (prolog/ui/checkbox.pl's module header) -- growing the    */
+  /* label's own box while pinning the input (and, via its centered      */
+  /* Indicator, the checkmark glyph) to its original size grows only     */
+  /* the invisible clickable area; the painted box stays pixel-identical */
+  /* to the desktop design. */
+  .px-checkbox {
+    width: 44px;
+    height: 44px;
+  }
+
+  .px-checkbox-input {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  /* Radio Group item: `.px-radio-group-item` is likewise a `<label>`    */
+  /* (prolog/ui/radio_group.pl's header) around the dot + text -- a      */
+  /* `min-height` alone grows the clickable row without touching the     */
+  /* dot's own fixed size. */
+  .px-radio-group-item {
+    min-height: 44px;
+  }
+
+  /* Switch: unlike Checkbox, `.px-switch` (the `<label>`, prolog/ui/    */
+  /* switch.pl's header) is ITSELF the painted track, so growing its     */
+  /* own box would inflate the visual pill, not just the hit area. An    */
+  /* invisible `::before` instead pads the hit area out to >= 44px:      */
+  /* generated content has no addressable DOM node of its own, so a      */
+  /* click landing on its painted (here: paint-less, content:"" only)    */
+  /* box is reported with the label itself as `event.target` -- native   */
+  /* `<label>`-forwards-click-to-its-control behavior applies exactly as */
+  /* if the click had landed on the label directly, zero JS needed. */
+  .px-switch {
+    position: relative;
+  }
+
+  .px-switch::before {
+    content: "";
+    position: absolute;
+    inset: -12px -6px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Dialog / Alert Dialog content already reads
+     `width: min(28rem, calc(100vw - 2rem))` -- below 480px that
+     collapses to `calc(100vw - 2rem)` on its own, exactly decision 4's
+     "viewport width minus a small inset" sheet, so there is nothing to
+     override here. Same for the Toast viewport's own
+     `width: min(24rem, calc(100vw - 2rem))` plus its `right: 1rem`
+     inset, which already spans the bottom edge with a matching inset
+     on both sides. */
+
+  /* Popover / Menu (Dropdown/Context/Menubar/Select's shared Content   */
+  /* rows use `.px-menu-content`) / Hover Card / Tooltip content: none   */
+  /* of these carry a `max-width` narrow enough to guarantee they fit a  */
+  /* sub-480px viewport once long content is involved -- clamp every     */
+  /* one to the viewport minus a small inset so lib/popper.js's own      */
+  /* boundary-padding clamping is never fought by an oversized box.      */
+  /* `.px-select-content`'s own `width` (pinned to the trigger's width   */
+  /* via `--px-select-trigger-width`) is capped the same way. */
+  .px-popover-content,
+  .px-menu-content,
+  .px-select-content,
+  .px-hover-card-content,
+  .px-tooltip-content {
+    max-width: calc(100vw - 2rem);
+  }
+
+  /* Navigation Menu flyout: plain `position: absolute` anchored to its  */
+  /* own trigger item, no popper.js boundary clamping at all (see        */
+  /* prolog/ui/navigation_menu.pl's header, "Platform choice") -- clamp  */
+  /* its own max-width, AND drop the link-card grid to a single column   */
+  /* so the grid's own `minmax(11rem, ...)` column floor can't force the */
+  /* panel wider than that clamp allows (confirmed via CDP: the          */
+  /* two-column grid alone overflowed a 390px viewport by ~118px before  */
+  /* this fix). */
+  .px-navigation-menu-content {
+    max-width: calc(100vw - 2rem);
+  }
+
+  /* Every trigger's Content stays in normal layout (only
+     opacity/visibility/pointer-events flip on data-state, per the
+     section above) even while closed, so an unopened flyout's own
+     `width: max-content` -- forced wide by the grid's column floor --
+     still counted toward the PAGE's scrollWidth (confirmed via CDP: a
+     closed flyout anchored to a non-first trigger item overflowed the
+     page even though nothing was visibly open). Collapsing width to 0
+     while closed removes that phantom contribution; the 0.18s
+     opacity/transform fade this only clips mid-transition on an actual
+     close interaction, not on initial (never-opened) render. */
+  .px-navigation-menu-content:not([data-state="open"]) {
+    max-width: 0;
+    overflow: hidden;
+  }
+
+  .px-navigation-menu-content-grid,
+  .px-navigation-menu-content-grid-featured {
+    grid-template-columns: 1fr;
+  }
+
+  .px-navigation-menu-content-grid-featured > .px-navigation-menu-featured {
+    grid-row: auto;
+  }
+
+  /* Toolbar: a single non-wrapping `inline-flex` row overflows once a   */
+  /* few buttons/a separator/a toggle group are all present (confirmed   */
+  /* via CDP: ~99px overflow on the demo page below) -- let it wrap      */
+  /* instead of forcing horizontal scroll; Toolbar's own roving-focus JS */
+  /* (assets/js/components/toolbar.js) tracks DOM/tabindex order, not    */
+  /* visual position, so wrapping doesn't affect keyboard navigation.    */
+  .px-toolbar {
+    flex-wrap: wrap;
+  }
+}

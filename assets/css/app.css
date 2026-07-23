@@ -29,6 +29,12 @@
 
 * { box-sizing: border-box; }
 
+html {
+  /* Mobile browsers otherwise inflate text after rotation (adr/0028). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -38,19 +44,28 @@ body {
   color-scheme: dark;
 }
 
+/* Mobile-first (adr/0028): the narrow screen is the default; widths
+   and paddings grow under min-width queries, never the reverse. */
 .page {
   max-width: 760px;
   margin: 0 auto;
-  padding: 2.5rem 1.5rem 4rem;
+  padding: 1.5rem 1rem 3rem;
+}
+
+@media (min-width: 640px) {
+  .page {
+    padding: 2.5rem 1.5rem 4rem;
+  }
 }
 
 h1, h2, h3, h4, h5, h6 {
   line-height: 1.25;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 
-h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
-h2 { font-size: 1.35rem; margin-top: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+h1 { font-size: clamp(1.45rem, 4.5vw, 1.8rem); margin-bottom: 0.5rem; }
+h2 { font-size: clamp(1.15rem, 3.5vw, 1.35rem); margin-top: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
 
 p { color: var(--text); }
 
@@ -78,6 +93,15 @@ a:hover { text-decoration: underline; }
   color: var(--text);
   font-family: "SF Mono", Consolas, Menlo, monospace;
   font-size: 0.92rem;
+  /* Long monospace slugs must wrap, not push the page wide (adr/0028). */
+  overflow-wrap: anywhere;
+}
+
+/* ≥44px touch targets on coarse pointers (adr/0028 decision 3). */
+@media (pointer: coarse) {
+  .adr-list a {
+    padding: 0.85rem 1rem;
+  }
 }
 
 .adr-list a:hover {
@@ -134,10 +158,16 @@ hr {
 form {
   max-width: 28rem;
   margin: 1.5rem 0 3rem;
-  padding: 1.5rem;
+  padding: 1rem;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+@media (min-width: 640px) {
+  form {
+    padding: 1.5rem;
+  }
 }
 
 .field {
@@ -246,6 +276,18 @@ form input[type="submit"]:hover,
 button[type="submit"]:hover,
 input[type="submit"]:hover {
   background: var(--accent-hover);
+}
+
+/* Full-width, comfortably tappable submit on narrow screens
+   (adr/0028 decisions 2 and 3). */
+@media (max-width: 480px) {
+  form button,
+  form input[type="submit"],
+  button[type="submit"],
+  input[type="submit"] {
+    width: 100%;
+    padding: 0.8rem 1.5rem;
+  }
 }
 
 form button:focus-visible,
