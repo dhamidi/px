@@ -161,8 +161,15 @@ tracked_file(F) :-
     ;   config_app_file(F)
     ).
 
+%   SWI-Prolog 10 ships a built-in file_search_path(app, swi(app)) --
+%   a COMPOUND value -- which enumerates before our own registered
+%   clause. atom(Dir) skips it (and any other non-atomic alias entry)
+%   so we commit to the real, atomic application directory. Without
+%   this, under_dir/2's atom_concat(Dir, '/', _) errors on swi(app)
+%   at boot on 10.x (9.x has no built-in app path, so it never showed).
 app_dir(Dir) :-
     user:file_search_path(app, Dir),
+    atom(Dir),
     !.
 
 under_dir(F, Dir) :-
