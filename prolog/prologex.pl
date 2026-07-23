@@ -162,6 +162,7 @@ prologex_run :-
            "prologex: ~w worker(s) on port ~w, database ~w~n",
            [Workers, Port, DBPath]),
     worker:start_workers(Port, Workers, prologex:px_conn),
+    worker:install_shutdown_handler,    % SIGTERM/SIGINT -> graceful (adr/0031)
     thread_get_message(_).
 
 load_app_config :-

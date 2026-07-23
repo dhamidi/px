@@ -45,13 +45,16 @@ RestartSec=2
 # enough for thousands of concurrent connections, each an open fd. See
 # adr/0015-load-test-10k-connections.md.
 LimitNOFILE=65536
-# swipl installs no SIGTERM handler, so the default stop sequence stalls
-# for the full 90s TimeoutStopSec before systemd escalates. Until graceful
-# shutdown is wired (bridge:shutdown_all_workers exists but is unbound to
-# any signal), kill outright: the app is stateless between requests and
-# sqlite recovers via its journal.
-KillSignal=SIGKILL
-TimeoutStopSec=5
+# The app now handles SIGTERM itself (worker:install_shutdown_handler/0,
+# wired from prologex_run/0) and exits promptly and cleanly on it -- see
+# adr/0031-graceful-shutdown-sigterm.md. This replaces the previous
+# KillSignal=SIGKILL/TimeoutStopSec=5 workaround, which existed only
+# because swipl had no SIGTERM handler at all and `stop` would otherwise
+# stall for the full default 90s TimeoutStopSec. TimeoutStopSec=15 here
+# is just a regression safety net -- normal graceful shutdown (a few
+# seconds, bounded by the handler's own grace period) finishes well
+# inside it; systemd's default KillSignal=SIGTERM applies.
+TimeoutStopSec=15
 
 [Install]
 WantedBy=default.target
