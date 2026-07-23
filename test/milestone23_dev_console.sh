@@ -42,10 +42,10 @@ sleep 7
 DEVPAGE=$(curl -s --max-time 6 "http://localhost:$DEV_PORT/posts/999")
 DEVCODE=$(curl -s --max-time 6 -o /dev/null -w "%{http_code}" "http://localhost:$DEV_PORT/posts/999")
 [ "$DEVCODE" = "404" ] && ok "dev model-fail is 404" || bad "dev model-fail code=$DEVCODE"
-echo "$DEVPAGE" | grep -q "px-diag" && ok "dev renders the rich diagnostic page" || bad "dev page not rich"
+echo "$DEVPAGE" | grep -q "px-console" && ok "dev renders the rich diagnostic page" || bad "dev page not rich"
 echo "$DEVPAGE" | grep -qi "model failed" && ok "dev classifies the failing stage (model failed)" || bad "dev did not classify"
 
-TOKEN=$(echo "$DEVPAGE" | grep -oE 'name="token" value="[a-f0-9]+"' | grep -oE '[a-f0-9]{16,}' | head -1)
+TOKEN=$(echo "$DEVPAGE" | grep -oE 'token="[a-f0-9]+"' | grep -oE '[a-f0-9]{16,}' | head -1)
 [ -n "$TOKEN" ] && ok "dev error page embeds a console token" || bad "no console token"
 
 EVAL=$(curl -s --max-time 6 -d "token=$TOKEN&goal=X is 40 %2B 2" "http://localhost:$DEV_PORT/__px/console")
@@ -57,7 +57,7 @@ NOAUTH=$(curl -s --max-time 6 -o /dev/null -w "%{http_code}" -d "goal=true" "htt
 # The standalone console PAGE (GET) -- browsable, not just on errors.
 PAGE=$(curl -s --max-time 6 "http://localhost:$DEV_PORT/__px/console")
 echo "$PAGE" | grep -q "Development console" && ok "dev GET /__px/console renders the console page" || bad "dev console page missing"
-PTOK=$(echo "$PAGE" | grep -oE 'name="token" value="[a-f0-9]+"' | grep -oE '[a-f0-9]{16,}' | head -1)
+PTOK=$(echo "$PAGE" | grep -oE 'token="[a-f0-9]+"' | grep -oE '[a-f0-9]{16,}' | head -1)
 PEVAL=$(curl -s --max-time 6 -d "token=$PTOK&goal=X is 21 %2B 21" "http://localhost:$DEV_PORT/__px/console")
 echo "$PEVAL" | grep -q "42" && ok "the page's own token evaluates a goal" || bad "console page eval: $PEVAL"
 
@@ -73,7 +73,7 @@ cd "$PXHOME"
 sleep 7
 
 PRODPAGE=$(curl -s --max-time 6 "http://localhost:$PROD_PORT/posts/999")
-echo "$PRODPAGE" | grep -q "px-diag" && bad "PRODUCTION LEAKS the diagnostic page" || ok "production serves NO diagnostic page"
+echo "$PRODPAGE" | grep -q "px-console" && bad "PRODUCTION LEAKS the diagnostic page" || ok "production serves NO diagnostic page"
 echo "$PRODPAGE" | grep -q "404 Not Found" && ok "production serves the terse 404 body" || bad "production 404 body unexpected"
 
 CONSCODE=$(curl -s --max-time 6 -o /dev/null -w "%{http_code}" -d "token=x&goal=true" "http://localhost:$PROD_PORT/__px/console")

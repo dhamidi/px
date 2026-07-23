@@ -72,8 +72,16 @@ advertises a route it does not serve. Both routes are registered
 only by `enable_dev_console/0`, so in production a `GET` or `POST` to
 `/__px/console` is an ordinary 404.
 
-The eval endpoint reads a goal string, evaluates it, and returns its
-output and the first solution's bindings. Evaluation is `read_term_from_atom` + `call` in a chosen
+The REPL is a `<px-console>` custom element — a terminal-style
+scrollback with command history (`↑`/`↓`), multi-line input
+(`Shift+Enter`), and `clear` — self-contained in the console page (no
+build step, no app asset pipeline). It POSTs a goal and renders the
+JSON reply: bindings as `Name = Value`, then `true.`/`false.`, output
+before the result, errors in red. The eval endpoint reads a goal
+string, evaluates it once **in module `user`** (so unqualified goals
+resolve against user's imports and app predicates are called
+qualified), and returns that JSON — output, the first solution's
+bindings, and whether it solved. Evaluation is `read_term_from_atom` + `call` in a chosen
 app module, output captured with `with_output_to`, errors caught and
 shown. The power of this is the whole point and the whole danger, so
 beyond the boot gate:

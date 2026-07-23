@@ -9,41 +9,40 @@
 
 Loaded by the facade, but INERT unless boot turns it on: prologex.pl's
 enable_dev_console/0 runs only when current_env(development), and it is
-the only caller of init_console/0 and the only place the console route
-(/__px/console) is registered. In production none of that runs -- the
-route is absent (a request to it is an ordinary 404), and a px build
-binary (loaded under PROLOGEX_ENV=production) contains no console route
-at all. This module's safety rests entirely on that boot gate.
+the only caller of init_console/0 and the only place the console routes
+(GET + POST /__px/console) are registered. In production none of that
+runs -- the routes are absent (a request is an ordinary 404), and a
+px build binary (loaded under PROLOGEX_ENV=production) contains no
+console at all. This module's safety rests entirely on that boot gate.
 
-Two capabilities, both development-only:
+Three capabilities, all development-only:
 
+  - console_page/2 (GET): a standalone, browsable REPL page hosting the
+    <px-console> custom element -- a terminal-style scrollback with
+    command history and multi-line input.
   - dev_error_render/4 (the px_env multifile hook): turns a terse
     404/500 into a diagnostic page -- the failure classified from the
-    request breadcrumb trace (px_env:request_trace/1), the plain-term
-    env dumped legibly, the error term for a 500, the route table for
-    a 404, and the inline REPL form.
-
-  - console_eval/2: the REPL endpoint. Evaluates a goal string and
-    returns its output/bindings. Powerful, hence gated three ways:
-    the route only exists in development; a per-boot 128-bit token
-    (embedded only in the same-origin error page) is required, so a
-    blind cross-site POST cannot reach it; and it is never present in
-    a production/binary build.
+    request breadcrumb trace, the plain-term env dumped legibly, the
+    route table, and the same <px-console> REPL inline.
+  - console_eval/2 (POST): the eval endpoint. Reads a goal, evaluates
+    it once, and returns JSON (bindings / output / true / false /
+    error). Powerful, hence gated three ways: the routes exist only in
+    development; a per-boot 128-bit token (embedded only in the
+    same-origin page the element reads it from) is required, so a blind
+    cross-site POST cannot reach it; and none of it is present in a
+    production/binary build.
 */
 
 :- use_module(library(lists)).
 :- use_module(library(apply)).
 :- use_module(library(crypto)).
+:- use_module(library(http/json)).
 :- use_module(px_env, [respond/4, param/3, params/2, env_get/3,
                        request_trace/1]).
-:- use_module(px_template, [render_to_string/2]).
 
 :- dynamic console_token_fact/1.
 
 %!  init_console is det.
-%
-%   Generate the per-boot random token (adr/0038). Called once by
-%   prologex.pl's enable_dev_console/0, development only.
 init_console :-
     retractall(console_token_fact(_)),
     crypto_n_random_bytes(16, Bytes),
@@ -56,84 +55,76 @@ console_token(Token) :-
 
 
 		 /*******************************
-		 *      THE REPL ENDPOINT       *
+		 *      THE EVAL ENDPOINT       *
 		 *******************************/
 
 %!  console_eval(+Env0, -Env) is det.
 %
-%   Reachable only in development (the route is mounted only then).
-%   Requires the per-boot token; a mismatch is a flat 403 with no
-%   detail. On success, evaluate the goal string in module `user`
-%   (app predicates are called qualified, e.g.
-%   `guestbook_commands:load_comments(Cs)`), capturing output and the
-%   first solution's bindings, and answer an HTML fragment.
+%   POST /__px/console (development only). Requires the per-boot token;
+%   a mismatch is a 403. On success, evaluate the goal string once in
+%   module `user` (app predicates called qualified), capturing output
+%   and the first solution's bindings, and answer JSON the <px-console>
+%   element renders.
 console_eval(Env0, Env) :-
     (   param(Env0, token, Tok),
         console_token(Expected),
         Tok == Expected
     ->  (   param(Env0, goal, GoalStr)
-        ->  eval_goal(GoalStr, Html)
-        ;   Html = "<p class=\"px-console-error\">no goal</p>"
+        ->  eval_json(GoalStr, Json)
+        ;   Json = json([ok= @(false), error="no goal given"])
         ),
-        respond(Env0, raw(Html),
-                [ status(200),
-                  header("content-type", "text/html; charset=utf-8") ],
-                Env)
-    ;   respond(Env0, "forbidden", [status(403)], Env)
+        json_response(Env0, 200, Json, Env)
+    ;   json_response(Env0, 403, json([ok= @(false), error="forbidden"]), Env)
     ).
 
-eval_goal(GoalStr, Html) :-
-    catch(read_term_from_atom(GoalStr, Goal, [variable_names(Vars)]),
-          ReadErr,
-          ( format(string(Html), "<p class=\"px-console-error\">parse error: ~w</p>",
-                   [ReadErr]), Vars = fail )),
-    (   Vars == fail
-    ->  true                                    % Html already set
-    ;   run_goal(Goal, Vars, Html)
-    ).
+json_response(Env0, Status, JsonTerm, Env) :-
+    with_output_to(string(S), json_write(current_output, JsonTerm, [width(0)])),
+    respond(Env0, raw(S),
+            [ status(Status),
+              header("content-type", "application/json; charset=utf-8") ],
+            Env).
 
-run_goal(Goal, Vars, Html) :-
-    (   catch(with_output_to(string(Output), once_result(Goal, Solved)),
-              Err, Failed = Err)
+%!  eval_json(+GoalStr, -JsonTerm) is det.
+eval_json(GoalStr, JsonTerm) :-
+    catch(
+        ( read_term_from_atom(GoalStr, Goal, [variable_names(Vars)]),
+          run_json(Goal, Vars, JsonTerm) ),
+        Err,
+        ( message_to_string(Err, M),
+          JsonTerm = json([ok= @(false), error=M]) )).
+
+run_json(Goal, Vars, JsonTerm) :-
+    (   catch(with_output_to(string(Output), solve(Goal, Solved)),
+              GErr, GCaught = GErr)
     ->  true
-    ;   Solved = failed, Output = ""
+    ;   Solved = false, Output = ""
     ),
-    (   nonvar(Failed)
-    ->  format(string(Html),
-               "<pre class=\"px-console-error\">~w</pre>",
-               [Failed])
-    ;   Solved == failed
-    ->  Html = "<pre class=\"px-console-out\">false.</pre>"
-    ;   bindings_html(Vars, BindHtml),
-        (   Output == ""
-        ->  format(string(Html), "<pre class=\"px-console-out\">~wtrue.</pre>", [BindHtml])
-        ;   escape_html(Output, EscOut),
-            format(string(Html),
-                   "<pre class=\"px-console-out\">~w~wtrue.</pre>",
-                   [EscOut, BindHtml])
-        )
+    (   nonvar(GCaught)
+    ->  message_to_string(GCaught, EM),
+        JsonTerm = json([ok= @(false), error=EM])
+    ;   bindings_json(Vars, BJson),
+        JsonTerm = json([ ok= @(true),
+                          solved= @(Solved),
+                          output=Output,
+                          bindings=BJson ])
     ).
 
-once_result(Goal, Solved) :-
-    (   call(Goal)
-    ->  Solved = solved
-    ;   Solved = failed
+%   Evaluate in `user`, not px_console: unqualified goals resolve
+%   against user's imports (library preds, and app predicates called
+%   qualified), and an error reads `user:foo/1`, not the framework's
+%   internals.
+solve(Goal, Solved) :-
+    (   call(user:Goal)
+    ->  Solved = true
+    ;   Solved = false
     ),
     !.
 
-bindings_html([], "") :- !.
-bindings_html(Vars, Html) :-
-    findall(Line,
-            ( member(Name=Value, Vars),
-              format(string(V0), "~p", [Value]),
-              escape_html(V0, V),
-              format(string(Line), "~w = ~w\n", [Name, V]) ),
-            Lines),
-    atomics_to_string(Lines, Html).
-
-atomics_to_string(List, S) :-
-    atomic_list_concat(List, Atom),
-    atom_string(Atom, S).
+bindings_json([], []).
+bindings_json([Name=Value|T], [json([name=NameS, value=VS])|R]) :-
+    to_str(Name, NameS),
+    format(string(VS), "~p", [Value]),
+    bindings_json(T, R).
 
 
 		 /*******************************
@@ -142,36 +133,12 @@ atomics_to_string(List, S) :-
 
 %!  console_page(+Env0, -Env) is det.
 %
-%   GET /__px/console -- the REPL as a standalone, browsable page
-%   (adr/0038). Registered only in development (prologex.pl's
-%   enable_dev_console/0), so it does not exist in production; this
-%   handler is never reached there. Same shell as the error page --
-%   the request env dumped as a legible plain term, the route table,
-%   and the token-guarded REPL -- with a console intro in place of a
-%   failure classification.
+%   GET /__px/console (development only): the REPL as a standalone,
+%   browsable page.
 console_page(Env0, Env) :-
-    Intro = "<p class=\"px-hint\">Evaluate goals against the running application. \
-Call app predicates qualified, e.g. <code>guestbook_commands:load_comments(Cs)</code>. \
-This page exists only in development.</p>",
-    ( console_token(Token) -> true ; Token = "" ),
-    env_dump(Env0, EnvHtml),
-    routes_html(RoutesHtml),
-    format(string(Html),
-"<!DOCTYPE html><html><head><meta charset=\"utf-8\">\
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
-<title>Console — prologex (development)</title><style>~w</style></head><body>\
-<div class=\"px-diag\">\
-<h1>Development console</h1>~w\
-<form class=\"px-console\" onsubmit=\"return pxEval(event)\">\
-<input type=\"hidden\" name=\"token\" value=\"~w\">\
-<textarea name=\"goal\" rows=\"3\" placeholder=\"a goal, e.g. some_commands:load(X)\"></textarea>\
-<button>Evaluate</button></form>\
-<div class=\"px-console-result\" id=\"pxout\"></div>\
-<h2>Request</h2><pre class=\"px-env\">~w</pre>\
-<h2>Routes</h2>~w\
-</div>\
-<script>~w</script></body></html>",
-           [page_css, Intro, Token, EnvHtml, RoutesHtml, page_js]),
+    Intro = "<p class=\"pxd-hint\">Evaluate goals against the running application. \
+Call app predicates qualified, e.g. <code>guestbook_commands:load_comments(Cs)</code>.</p>",
+    render_page("Console", "Development console", Intro, Env0, Html),
     respond(Env0, raw(Html),
             [ status(200), header("content-type", "text/html; charset=utf-8") ],
             Env).
@@ -183,70 +150,77 @@ This page exists only in development.</p>",
 
 :- multifile px_env:dev_error_render/4.
 
-%   The hook px_env consults in development for a 404/500 (adr/0038).
 px_env:dev_error_render(Env0, Diag, Status, raw(Html)) :-
     px_console:error_page(Env0, Diag, Status, Html).
 
 error_page(Env0, Diag, Status, Html) :-
     request_trace(Trace),
     classify(Diag, Status, Trace, Env0, Headline, Detail),
-    env_dump(Env0, EnvHtml),
-    trace_html(Trace, TraceHtml),
-    routes_html(RoutesHtml),
+    render_page(Status, Headline, Detail, Env0, Html).
+
+
+		 /*******************************
+		 *        THE PAGE SHELL        *
+		 *******************************/
+
+%!  render_page(+Title, +Headline, +DetailHtml, +Env0, -Html) is det.
+%
+%   The shared shell: title, headline, a detail block (error
+%   classification or console intro), the <px-console> element, then
+%   the plain-term request env and the route table.
+render_page(Title, Headline, Detail, Env0, Html) :-
     ( console_token(Token) -> true ; Token = "" ),
+    env_dump(Env0, EnvHtml),
+    routes_html(RoutesHtml),
+    shell_css(ShellCss),
+    console_js(ConsoleJs),
     format(string(Html),
-"<!DOCTYPE html><html><head><meta charset=\"utf-8\">\
+"<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">\
 <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
 <title>~w — prologex (development)</title><style>~w</style></head><body>\
-<div class=\"px-diag\">\
+<div class=\"pxd\">\
 <h1>~w</h1>~w\
-<h2>Request</h2><pre class=\"px-env\">~w</pre>\
-<h2>What happened</h2>~w\
-<h2>Console</h2>\
-<form class=\"px-console\" onsubmit=\"return pxEval(event)\">\
-<input type=\"hidden\" name=\"token\" value=\"~w\">\
-<textarea name=\"goal\" rows=\"2\" placeholder=\"a goal, e.g. some_commands:load(X)\"></textarea>\
-<button>Evaluate</button></form>\
-<div class=\"px-console-result\" id=\"pxout\"></div>\
-<h2>Routes</h2>~w\
+<px-console token=\"~w\"></px-console>\
+<details class=\"pxd-more\"><summary>request</summary><pre class=\"pxd-env\">~w</pre></details>\
+<details class=\"pxd-more\"><summary>routes</summary>~w</details>\
 </div>\
 <script>~w</script></body></html>",
-           [Status, page_css, Headline, Detail, EnvHtml, TraceHtml,
-            Token, RoutesHtml, page_js]).
+           [Title, ShellCss, Headline, Detail, Token, EnvHtml, RoutesHtml,
+            ConsoleJs]).
 
-%   Classify the failure from the breadcrumb trace (adr/0038 the
-%   headline feature): distinguish a thrown exception, a handler that
-%   ran but declined (the silent-404 case), and no route at all.
+
+		 /*******************************
+		 *       ERROR CLASSIFY         *
+		 *******************************/
+
 classify(error(E), _, _, _, "500 — an exception was thrown", Detail) :-
     !,
     message_to_string(E, Msg),
     ( E = error(_, context(Ctx, _)) -> format(string(CtxS), "~p", [Ctx]) ; CtxS = "" ),
     escape_html(Msg, EMsg),
     format(string(Detail),
-           "<pre class=\"px-error\">~w</pre><p class=\"px-hint\">~w</p>",
+           "<pre class=\"pxd-error\">~w</pre><p class=\"pxd-hint\">~w</p>",
            [EMsg, CtxS]).
 classify(_, 404, Trace, Env0, Headline, Detail) :-
     env_get(Env0, method, M), env_get(Env0, path, P),
     (   member(model_failed(Mod, Action), Trace)
     ->  Headline = "404 — the model failed",
         format(string(Detail),
-               "<p><code>~w ~w</code> reached <code>~w:model(~w, ...)</code>, which <b>failed</b> — and a failing model is the 404 (adr/0027). The usual causes: a <code>row/2</code> lookup with no match, a <code>path_id</code> that didn't parse, or a <code>field/3</code> on a column that isn't there. Reproduce it in the console below.</p>",
+               "<p><code>~w ~w</code> reached <code>~w:model(~w, ...)</code>, which <b>failed</b> — and a failing model is the 404 (a failed row lookup, a <code>path_id</code> that didn't parse, a <code>field/3</code> on a missing column). Reproduce it below.</p>",
                [M, P, Mod, Action])
     ;   member(handler(Mod, Action), Trace)
     ->  Headline = "404 — handler ran, produced nothing",
         format(string(Detail),
-               "<p><code>~w ~w</code> matched <code>~w:~w</code>, but it declined (authorization, or an update with no matching clause). See the console.</p>",
+               "<p><code>~w ~w</code> matched <code>~w:~w</code>, but it declined.</p>",
                [M, P, Mod, Action])
     ;   Headline = "404 — no route matched",
         format(string(Detail),
-               "<p>Nothing in the route table matches <code>~w ~w</code>. The full table is at the bottom.</p>",
+               "<p>Nothing in the route table matches <code>~w ~w</code>.</p>",
                [M, P])
     ).
 classify(_, Status, _, _, Headline, "") :-
     format(string(Headline), "~w", [Status]).
 
-%   The env as a legible aligned dump -- the payoff of the plain-term
-%   representation (adr/0037): it just prints.
 env_dump(Env0, Html) :-
     findall(Line,
             ( member(Key-Value, Env0),
@@ -257,9 +231,6 @@ env_dump(Env0, Html) :-
             Lines),
     atomics_to_string(Lines, Html).
 
-trace_html([], "<p class=\"px-hint\">(no breadcrumbs)</p>") :- !.
-trace_html(_, "") .   % detail already carries the story; keep the section lean
-
 routes_html(Html) :-
     findall(Row,
             ( router:route(Name, Method, Segments, _),
@@ -268,7 +239,9 @@ routes_html(Html) :-
                      [Method, Path, Name]) ),
             Rows),
     atomics_to_string(Rows, Body),
-    format(string(Html), "<table class=\"px-routes\"><tr><th>method</th><th>path</th><th>name</th></tr>~w</table>", [Body]).
+    format(string(Html),
+           "<table class=\"pxd-routes\"><tr><th>method</th><th>path</th><th>name</th></tr>~w</table>",
+           [Body]).
 
 seg_path([], "/") :- !.
 seg_path(Segs, Path) :-
@@ -279,13 +252,17 @@ seg_str(param(N), S) :- !, format(atom(S), ":~w", [N]).
 seg_str(splat(N), S) :- !, format(atom(S), "*~w", [N]).
 seg_str(A, A).
 
+
+		 /*******************************
+		 *         SMALL BITS           *
+		 *******************************/
+
 escape_html(In, Out) :-
     to_str(In, S),
     replace_all(S, "&", "&amp;", A),
     replace_all(A, "<", "&lt;", B),
     replace_all(B, ">", "&gt;", Out).
 
-%   Split on the single-char From and rejoin with To.
 replace_all(S, From, To, Out) :-
     split_string(S, From, "", Parts),
     atomic_list_concat(Parts, To, Atom),
@@ -293,6 +270,63 @@ replace_all(S, From, To, Out) :-
 
 to_str(X, S) :- ( string(X) -> S = X ; atom(X) -> atom_string(X, S) ; format(string(S), "~w", [X]) ).
 
-page_css("body{margin:0;background:#0f1115;color:#e6e8eb;font-family:-apple-system,Segoe UI,sans-serif}.px-diag{max-width:900px;margin:0 auto;padding:2rem 1.25rem}h1{font-size:1.4rem;color:#f87171}h2{font-size:1rem;color:#9aa4b2;border-bottom:1px solid #262b34;padding-bottom:.3rem;margin-top:2rem}code{background:#1c2129;padding:.1em .35em;border-radius:4px}pre{background:#161a21;border:1px solid #262b34;border-radius:8px;padding:1rem;overflow:auto;white-space:pre-wrap}.px-env{color:#849dff}.px-error{color:#f87171}.px-hint{color:#9aa4b2}.px-console textarea{width:100%;background:#0f1115;color:#e6e8eb;border:1px solid #262b34;border-radius:8px;padding:.6rem;font-family:SF Mono,Consolas,monospace}.px-console button{margin-top:.5rem;background:#3E63DD;color:#fff;border:none;border-radius:8px;padding:.5rem 1.25rem;font-weight:600;cursor:pointer}.px-routes{width:100%;border-collapse:collapse;font-size:.85rem}.px-routes td,.px-routes th{text-align:left;padding:.3rem .6rem;border-bottom:1px solid #262b34}").
+atomics_to_string(List, S) :-
+    atomic_list_concat(List, Atom),
+    atom_string(Atom, S).
 
-page_js("function pxEval(e){e.preventDefault();var f=e.target;var b=new URLSearchParams();b.set('token',f.token.value);b.set('goal',f.goal.value);fetch('/__px/console',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b.toString()}).then(r=>r.text()).then(t=>{document.getElementById('pxout').innerHTML=t});return false}").
+
+		 /*******************************
+		 *        STYLE + ELEMENT       *
+		 *******************************/
+
+shell_css("*{box-sizing:border-box}body{margin:0;background:#0f1115;color:#e6e8eb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;line-height:1.55}.pxd{max-width:920px;margin:0 auto;padding:2rem 1.25rem 4rem}.pxd h1{font-size:1.35rem;margin:.2rem 0 .75rem}.pxd-hint{color:#9aa4b2;margin:.25rem 0 1.25rem}.pxd-error{color:#f87171;background:#161a21;border:1px solid #262b34;border-radius:8px;padding:1rem;white-space:pre-wrap;overflow:auto}code{background:#1c2129;padding:.12em .38em;border-radius:5px;font-family:SF Mono,Consolas,Menlo,monospace;font-size:.92em}.pxd-more{margin-top:1.25rem;border-top:1px solid #262b34;padding-top:.5rem}.pxd-more summary{color:#9aa4b2;cursor:pointer;font-size:.85rem;letter-spacing:.04em;text-transform:uppercase;user-select:none}.pxd-env{background:#161a21;border:1px solid #262b34;border-radius:8px;padding:1rem;color:#849dff;font-family:SF Mono,Consolas,Menlo,monospace;font-size:.82rem;white-space:pre-wrap;overflow:auto;margin-top:.75rem}.pxd-routes{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:.75rem}.pxd-routes td,.pxd-routes th{text-align:left;padding:.3rem .6rem;border-bottom:1px solid #262b34}.pxd-routes th{color:#9aa4b2;font-weight:600}\
+px-console{display:block;margin:.5rem 0 1rem}.pxc{background:#0a0c10;border:1px solid #2b313c;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.03);font-family:SF Mono,Consolas,Menlo,monospace;font-size:13px;line-height:1.55}.pxc-bar{display:flex;align-items:center;gap:.4rem;padding:.5rem .85rem;border-bottom:1px solid #1c2129;background:#0f1216}.pxc-dot{width:11px;height:11px;border-radius:50%}.pxc-dot.r{background:#f87171}.pxc-dot.y{background:#e3b341}.pxc-dot.g{background:#3fb950}.pxc-title{margin-left:.4rem;color:#6b7280;font-size:11px;letter-spacing:.05em}.pxc-scroll{max-height:52vh;overflow-y:auto;padding:.85rem 1rem;scroll-behavior:smooth}.pxc-entry{white-space:pre-wrap;word-break:break-word;margin:0 0 .1rem}.pxc-goal{color:#e6e8eb;margin-top:.35rem}.pxc-eprompt{color:#5472e4;user-select:none}.pxc-result{color:#7ee787}.pxc-output{color:#c9d1d9}.pxc-error{color:#f87171}.pxc-info{color:#6b7280;margin-bottom:.35rem}.pxc-pending{color:#6b7280}.pxc-row{display:flex;align-items:flex-start;gap:.55rem;border-top:1px solid #1c2129;padding:.6rem 1rem;background:#0f1216}.pxc-prompt{color:#5472e4;user-select:none;padding-top:1px}.pxc-input{flex:1;background:transparent;color:#e6e8eb;border:0;outline:0;resize:none;font:inherit;padding:0;overflow:hidden}.pxc-input::placeholder{color:#4b5563}").
+
+%   The <px-console> custom element: a terminal-style REPL with
+%   scrollback, command history (up/down), multi-line input
+%   (Shift+Enter), and JSON-driven result rendering. Written with
+%   single-quoted JS strings and backtick templates to keep escaping
+%   in this Prolog string minimal (only \\n and \").
+console_js("class PxConsole extends HTMLElement{\
+connectedCallback(){\
+this.token=this.getAttribute('token')||'';this.history=[];this.hi=-1;\
+this.innerHTML=`<div class=pxc><div class=pxc-bar><span class='pxc-dot r'></span><span class='pxc-dot y'></span><span class='pxc-dot g'></span><span class=pxc-title>prologex console</span></div><div class=pxc-scroll></div><div class=pxc-row><span class=pxc-prompt>?-</span><textarea class=pxc-input rows=1 autocomplete=off autocapitalize=off spellcheck=false placeholder='a goal, then Enter'></textarea></div></div>`;\
+this.scroll=this.querySelector('.pxc-scroll');this.input=this.querySelector('.pxc-input');\
+this.input.addEventListener('keydown',e=>this.onKey(e));\
+this.input.addEventListener('input',()=>this.autosize());\
+this.addEventListener('mousedown',e=>{if(e.target===this.scroll||e.target.closest('.pxc-bar'))return;});\
+this.echo('info','Enter runs · Shift+Enter newline · \\u2191\\u2193 history · \"clear\" resets');\
+this.input.focus()}\
+autosize(){this.input.style.height='auto';this.input.style.height=this.input.scrollHeight+'px'}\
+onKey(e){\
+if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();this.run()}\
+else if(e.key==='ArrowUp'&&this.firstLine()){e.preventDefault();this.hPrev()}\
+else if(e.key==='ArrowDown'&&this.lastLine()){e.preventDefault();this.hNext()}\
+else if(e.key==='l'&&e.ctrlKey){e.preventDefault();this.clear()}}\
+firstLine(){return this.input.value.lastIndexOf('\\n',this.input.selectionStart-1)<0}\
+lastLine(){return this.input.value.indexOf('\\n',this.input.selectionStart)<0}\
+hPrev(){if(!this.history.length)return;if(this.hi<0)this.hi=this.history.length;this.hi=Math.max(0,this.hi-1);this.input.value=this.history[this.hi];this.autosize();this.toEnd()}\
+hNext(){if(this.hi<0)return;this.hi++;if(this.hi>=this.history.length){this.hi=-1;this.input.value=''}else this.input.value=this.history[this.hi];this.autosize();this.toEnd()}\
+toEnd(){const n=this.input.value.length;requestAnimationFrame(()=>this.input.setSelectionRange(n,n))}\
+async run(){\
+const g=this.input.value.trim();if(!g)return;\
+if(g==='clear'){this.input.value='';this.autosize();this.clear();return}\
+this.history.push(g);this.hi=-1;this.echo('goal',g);this.input.value='';this.autosize();\
+const p=this.echo('pending','\\u2026');\
+try{const b=new URLSearchParams();b.set('token',this.token);b.set('goal',g);\
+const r=await fetch('/__px/console',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b.toString()});\
+const d=await r.json();p.remove();this.render(d)}\
+catch(err){p.remove();this.echo('error',String(err))}\
+this.down()}\
+render(d){\
+if(!d.ok){this.echo('error',d.error||'error');return}\
+if(d.output)this.echo('output',d.output.replace(/\\n$/,''));\
+if(!d.solved){this.echo('result','false.');return}\
+if(d.bindings&&d.bindings.length){this.echo('result',d.bindings.map(x=>x.name+' = '+x.value).join('\\n')+'\\ntrue.')}\
+else this.echo('result','true.')}\
+echo(cls,text){const e=document.createElement('div');e.className='pxc-entry pxc-'+cls;\
+if(cls==='goal'){const s=document.createElement('span');s.className='pxc-eprompt';s.textContent='?- ';e.appendChild(s);e.appendChild(document.createTextNode(text))}\
+else e.textContent=text;this.scroll.appendChild(e);this.down();return e}\
+clear(){this.scroll.innerHTML=''}\
+down(){this.scroll.scrollTop=this.scroll.scrollHeight}}\
+customElements.define('px-console',PxConsole);").
