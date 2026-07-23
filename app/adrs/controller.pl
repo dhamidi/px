@@ -12,8 +12,15 @@ IS the 404 (adr/0027 decision 2).
 :- page(index, "/",        [as(home)]).       % helper: home_path
 :- page(show,  "/adr/:id", [as(adr)]).        % helper: adr_path(Id)
 
-model(index, _Env, adr_index(Slugs)) :-
-    adr_slugs(Slugs).
+model(index, _Env, adr_index(Slugs, Dev)) :-
+    adr_slugs(Slugs),
+    %   The development console page (/__px/console) exists only in
+    %   development; show its link only there so production never
+    %   advertises a route it does not serve.
+    (   current_env(development)
+    ->  Dev = dev
+    ;   Dev = prod
+    ).
 model(show, Env, adr_page(Slug, Markdown)) :-
     param(Env, id, Slug),                     % slug, not numeric: param/3
     adr_markdown(Slug, Markdown).

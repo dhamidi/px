@@ -61,9 +61,19 @@ HTML diagnostic page instead of the terse body:
 
 ## Decision 3: the inline REPL
 
-A development-only endpoint (`POST` to a fixed dev path) reads a goal
-string, evaluates it, and returns its output and the first solution's
-bindings. Evaluation is `read_term_from_atom` + `call` in a chosen
+The REPL is reachable two ways in development, both at the fixed dev
+path `/__px/console`: `POST` evaluates a goal (used by the error page
+and the console page alike), and `GET` renders a standalone,
+browsable **console page** — the same token-guarded REPL, the env
+dumped as a legible term, and the route table, without an error to
+attach to. The example app links to it from its home page in
+development only (`current_env(development)`); production never
+advertises a route it does not serve. Both routes are registered
+only by `enable_dev_console/0`, so in production a `GET` or `POST` to
+`/__px/console` is an ordinary 404.
+
+The eval endpoint reads a goal string, evaluates it, and returns its
+output and the first solution's bindings. Evaluation is `read_term_from_atom` + `call` in a chosen
 app module, output captured with `with_output_to`, errors caught and
 shown. The power of this is the whole point and the whole danger, so
 beyond the boot gate:

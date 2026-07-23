@@ -85,7 +85,7 @@ statements, and installs the connection via px_query:use_db/1
 :- reexport(px_query,    [row/2, field/3, insert/3, update/3, delete/2, sql/3]).
 :- reexport(px_form,     [form_result/3, form_validate/3, field_value/3]).
 :- reexport(px_turbo,    [turbo_or_redirect/4, turbo_stream/3, dom_id/2]).
-:- reexport(px_config,   [config/2, require_config/2]).
+:- reexport(px_config,   [config/2, require_config/2, current_env/1]).
 :- reexport(px_template, [render_to_string/2]).
 :- reexport(px_assets,   [asset_path/2, serve_asset/2]).
 :- use_module(px_router,     []).   % directives are global term_expansion
@@ -199,6 +199,8 @@ prologex_load :-
 enable_dev_console :-
     px_env:set_dev_diagnostics(true),
     px_console:init_console,
+    router:add_route(px_console_page, get, "/__px/console",
+                     px_console:console_page),
     router:add_route(px_console_eval, post, "/__px/console",
                      px_console:console_eval).
 

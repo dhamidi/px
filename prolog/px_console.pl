@@ -1,7 +1,8 @@
 :- module(px_console,
           [ init_console/0,          % boot: generate the per-boot token
             console_token/1,         % -Token   (dev only)
-            console_eval/2           % +Env0, -Env   (the REPL endpoint)
+            console_page/2,          % +Env0, -Env   (GET, the console page)
+            console_eval/2           % +Env0, -Env   (POST, the REPL endpoint)
           ]).
 
 /** <module> The development console and rich error page (adr/0038).
@@ -133,6 +134,47 @@ bindings_html(Vars, Html) :-
 atomics_to_string(List, S) :-
     atomic_list_concat(List, Atom),
     atom_string(Atom, S).
+
+
+		 /*******************************
+		 *      THE CONSOLE PAGE        *
+		 *******************************/
+
+%!  console_page(+Env0, -Env) is det.
+%
+%   GET /__px/console -- the REPL as a standalone, browsable page
+%   (adr/0038). Registered only in development (prologex.pl's
+%   enable_dev_console/0), so it does not exist in production; this
+%   handler is never reached there. Same shell as the error page --
+%   the request env dumped as a legible plain term, the route table,
+%   and the token-guarded REPL -- with a console intro in place of a
+%   failure classification.
+console_page(Env0, Env) :-
+    Intro = "<p class=\"px-hint\">Evaluate goals against the running application. \
+Call app predicates qualified, e.g. <code>guestbook_commands:load_comments(Cs)</code>. \
+This page exists only in development.</p>",
+    ( console_token(Token) -> true ; Token = "" ),
+    env_dump(Env0, EnvHtml),
+    routes_html(RoutesHtml),
+    format(string(Html),
+"<!DOCTYPE html><html><head><meta charset=\"utf-8\">\
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
+<title>Console — prologex (development)</title><style>~w</style></head><body>\
+<div class=\"px-diag\">\
+<h1>Development console</h1>~w\
+<form class=\"px-console\" onsubmit=\"return pxEval(event)\">\
+<input type=\"hidden\" name=\"token\" value=\"~w\">\
+<textarea name=\"goal\" rows=\"3\" placeholder=\"a goal, e.g. some_commands:load(X)\"></textarea>\
+<button>Evaluate</button></form>\
+<div class=\"px-console-result\" id=\"pxout\"></div>\
+<h2>Request</h2><pre class=\"px-env\">~w</pre>\
+<h2>Routes</h2>~w\
+</div>\
+<script>~w</script></body></html>",
+           [page_css, Intro, Token, EnvHtml, RoutesHtml, page_js]),
+    respond(Env0, raw(Html),
+            [ status(200), header("content-type", "text/html; charset=utf-8") ],
+            Env).
 
 
 		 /*******************************

@@ -54,6 +54,13 @@ echo "$EVAL" | grep -q "42" && ok "dev console evaluates a goal" || bad "dev con
 NOAUTH=$(curl -s --max-time 6 -o /dev/null -w "%{http_code}" -d "goal=true" "http://localhost:$DEV_PORT/__px/console")
 [ "$NOAUTH" = "403" ] && ok "dev console rejects a tokenless POST (403)" || bad "tokenless console code=$NOAUTH"
 
+# The standalone console PAGE (GET) -- browsable, not just on errors.
+PAGE=$(curl -s --max-time 6 "http://localhost:$DEV_PORT/__px/console")
+echo "$PAGE" | grep -q "Development console" && ok "dev GET /__px/console renders the console page" || bad "dev console page missing"
+PTOK=$(echo "$PAGE" | grep -oE 'name="token" value="[a-f0-9]+"' | grep -oE '[a-f0-9]{16,}' | head -1)
+PEVAL=$(curl -s --max-time 6 -d "token=$PTOK&goal=X is 21 %2B 21" "http://localhost:$DEV_PORT/__px/console")
+echo "$PEVAL" | grep -q "42" && ok "the page's own token evaluates a goal" || bad "console page eval: $PEVAL"
+
 kill -9 "$DEVPID" 2>/dev/null; DEVPID=""
 sleep 1
 
@@ -70,7 +77,10 @@ echo "$PRODPAGE" | grep -q "px-diag" && bad "PRODUCTION LEAKS the diagnostic pag
 echo "$PRODPAGE" | grep -q "404 Not Found" && ok "production serves the terse 404 body" || bad "production 404 body unexpected"
 
 CONSCODE=$(curl -s --max-time 6 -o /dev/null -w "%{http_code}" -d "token=x&goal=true" "http://localhost:$PROD_PORT/__px/console")
-[ "$CONSCODE" = "404" ] && ok "production console route is ABSENT (404, no attack surface)" || bad "PRODUCTION console route reachable: code=$CONSCODE"
+[ "$CONSCODE" = "404" ] && ok "production console eval route is ABSENT (404, no attack surface)" || bad "PRODUCTION console eval reachable: code=$CONSCODE"
+
+PAGECODE=$(curl -s --max-time 6 -o /dev/null -w "%{http_code}" "http://localhost:$PROD_PORT/__px/console")
+[ "$PAGECODE" = "404" ] && ok "production console PAGE is ABSENT (404)" || bad "PRODUCTION console page reachable: code=$PAGECODE"
 
 kill -9 "$PRODPID" 2>/dev/null; PRODPID=""
 
