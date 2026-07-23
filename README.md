@@ -77,8 +77,20 @@ test/             milestone proofs for each layer, run for real, not just writte
 ## Running it
 
 ```sh
-cd c && make
-cd .. && bin/server
+cd c && make          # once: build the FFI shared objects
+bin/px server         # boot the demo app
+```
+
+The `px` CLI (adr/0032) is the developer surface:
+
+```sh
+bin/px new myapp                # scaffold an application (boots immediately)
+bin/px generate feature notes   # scaffold app/notes/ in the adr/0029 shape
+bin/px routes                   # the route table, in match order
+bin/px console                  # SWI toplevel with the app loaded
+bin/px build                    # ONE deployable executable (adr/0033):
+                                #   assets served from memory, content baked,
+                                #   needs only apt install swi-prolog-nox libuv1
 ```
 
 Or as a systemd user service — see `deploy/prologex.service` for the

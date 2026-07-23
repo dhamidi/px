@@ -1,5 +1,7 @@
 :- module(prologex,
           [ prologex_run/0,
+            prologex_load/0,            % boot without serving (adr/0032)
+            prologex_serve/0,           % serve a loaded app (adr/0033)
             px_conn/3,                  % +WorkerId, +Loop, +Client
             px_request/3,               % +WorkerId, +Request, +Stream
             op(1100, xfx, ~>)
@@ -147,13 +149,28 @@ add_schema(SQL) :-
 %   Load config, default the pipeline, start the workers, block.
 
 prologex_run :-
+    prologex_load,
+    prologex_serve.
+
+%!  prologex_load is det.
+%!  prologex_serve is det.
+%
+%   The load/serve split (adr/0032 decision 5): load is everything
+%   that turns an app directory into a ready Prolog database --
+%   px routes and px console stop here, and px build (adr/0033)
+%   snapshots exactly this state. serve is everything that touches
+%   the outside world, and is the saved binary's entry goal.
+
+prologex_load :-
     load_app_config,
     ensure_app_paths,
     mount_assets_route,
     load_app_tree,
     ensure_pipeline,
     px_controller:ensure_layout,
-    px_assets:compile_assets,
+    px_assets:compile_assets.
+
+prologex_serve :-
     app_port(Port),
     app_workers(Workers),
     database_path(DBPath),
@@ -214,7 +231,8 @@ load_dir_modules(Dir) :-
         msort(Files, Sorted),
         forall(( member(F, Sorted), file_name_extension(_, pl, F) ),
                ( directory_file_path(Dir, F, Path),
-                 load_files(user:Path, [must_be_module(true), if(not_loaded)])
+                 load_files(user:Path, [must_be_module(true), if(not_loaded),
+                                        imports([])])
                ))
     ;   true
     ).

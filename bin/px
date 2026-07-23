@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#
+# bin/px -- the prologex command line (adr/0032).
+# Framework home is this script's own tree; PX_HOME overrides.
+set -euo pipefail
+
+PX_HOME="${PX_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+exec swipl -q -g px_cli:cli "$PX_HOME/prolog/px_cli.pl" -- "$@"
