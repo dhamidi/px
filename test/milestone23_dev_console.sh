@@ -33,8 +33,10 @@ rm -rf "$APP"
 ( cd "$APP" && "$PXHOME/bin/px" generate feature posts >/dev/null 2>&1 )
 
 # ============ DEVELOPMENT ============
-( cd "$APP" && PORT=$DEV_PORT swipl -q -g prologex_run "$PXHOME/prolog/prologex.pl" >/tmp/px_m23_dev.log 2>&1 ) &
+cd "$APP"
+PORT=$DEV_PORT swipl -q -g prologex_run "$PXHOME/prolog/prologex.pl" >/tmp/px_m23_dev.log 2>&1 &
 DEVPID=$!
+cd "$PXHOME"
 sleep 7
 
 DEVPAGE=$(curl -s --max-time 6 "http://localhost:$DEV_PORT/posts/999")
@@ -56,9 +58,11 @@ kill -9 "$DEVPID" 2>/dev/null; DEVPID=""
 sleep 1
 
 # ============ PRODUCTION (the security boundary) ============
-( cd "$APP" && PORT=$PROD_PORT PROLOGEX_ENV=production DATABASE_PATH=/tmp/px_m23_prod.db \
-    swipl -q -g prologex_run "$PXHOME/prolog/prologex.pl" >/tmp/px_m23_prod.log 2>&1 ) &
+cd "$APP"
+PORT=$PROD_PORT PROLOGEX_ENV=production DATABASE_PATH=/tmp/px_m23_prod.db \
+    swipl -q -g prologex_run "$PXHOME/prolog/prologex.pl" >/tmp/px_m23_prod.log 2>&1 &
 PRODPID=$!
+cd "$PXHOME"
 sleep 7
 
 PRODPAGE=$(curl -s --max-time 6 "http://localhost:$PROD_PORT/posts/999")
