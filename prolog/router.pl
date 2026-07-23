@@ -22,6 +22,17 @@ Segments - the path template already parsed (at registration time, via
            path_template//1) into a list of segment terms:
              - an atom  -- a literal path segment, e.g. adr
              - param(Name) -- a `:name` parameter segment, Name an atom
+             - splat(Name) -- a `*name` segment, Name an atom. MUST be
+               the last segment in a template; matches ONE OR MORE
+               remaining path segments, joined with "/" into a single
+               atom value (adr/0036: this is what lets development's
+               unhashed asset route, "/assets/" + "*file", capture a
+               nested logical name like "css/app.css" as one param).
+               Forward direction only (match_route/4's use) -- unlike
+               param(Name), there is no reverse/path_for/3 support;
+               nothing in this codebase builds a splat path from
+               Params, so match_path/3's splat clause below only
+               handles PathSegments bound.
 Handler  - the goal registered by the caller (module-qualified)
 
 Path strings on the wire look like "/adr/1" (already split off any
@@ -109,16 +120,22 @@ path_template([Segment|Segments]) -->
 
 %!  segment_token(-Segment)// is det.
 %
-%   Relates one raw token string to one segment term. The two clauses
-%   are disjoint on the token's leading character (":" or not), so no
-%   cut is required to keep this deterministic.
+%   Relates one raw token string to one segment term. The three
+%   clauses are disjoint on the token's leading character (":", "*",
+%   or neither), so no cut is required to keep this deterministic.
 segment_token(param(Name)) -->
     [Token],
     { string_concat(":", Rest, Token) },
     { atom_string(Name, Rest) }.
+segment_token(splat(Name)) -->
+    [Token],
+    { string_concat("*", Rest, Token) },
+    { atom_string(Name, Rest) }.
 segment_token(Literal) -->
     [Token],
-    { \+ string_concat(":", _, Token) },
+    { \+ string_concat(":", _, Token),
+      \+ string_concat("*", _, Token)
+    },
     { atom_string(Literal, Token) }.
 
 %!  match_route(+Method, +Path, -HandlerGoal, -Params) is nondet.
@@ -163,8 +180,12 @@ path_for(Name, Params, Path) :-
 match_path([], [], []).
 match_path([param(Name)|Segments], [Value|PathSegments], [Name=Value|Params]) :-
     match_path(Segments, PathSegments, Params).
+match_path([splat(Name)], PathSegments, [Name=Value]) :-
+    PathSegments \== [],
+    atomic_list_concat(PathSegments, '/', Value).
 match_path([Literal|Segments], [PathSegment|PathSegments], Params) :-
     Literal \= param(_),
+    Literal \= splat(_),
     literal_matches(Literal, PathSegment),
     match_path(Segments, PathSegments, Params).
 

@@ -37,6 +37,7 @@ Description=prologex ADR-browser demo
 After=network.target
 
 [Service]
+Environment=PROLOGEX_ENV=production
 Type=simple
 ExecStart=/home/exedev/prologex/deploy/run.sh
 Restart=on-failure

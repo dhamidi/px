@@ -90,6 +90,7 @@ statements, and installs the connection via px_query:use_db/1
 :- use_module(px_db,         []).
 :- use_module(px_controller, []).   % :- page directive (adr/0027, adr/0029)
 :- use_module(px_ui,         []).   % component library is framework surface
+:- use_module(px_reload,     []).   % dev-mode hot reload (adr/0036)
 :- use_module(worker,        []).
 :- use_module(http_stream,   []).
 
@@ -169,7 +170,17 @@ prologex_load :-
     load_app_tree,
     ensure_pipeline,
     px_controller:ensure_layout,
-    px_assets:compile_assets.
+    %   adr/0036: assets compile (hash + fingerprint, adr/0025) only
+    %   in production -- development serves straight from assets/ by
+    %   logical name, no compile step, so a CSS edit needs no restart.
+    %   Development also snapshots the just-loaded app tree's mtimes
+    %   (px_reload:record_boot_state/0) so hot reload's per-request
+    %   check has a boot-time reference point (see px_reload.pl's
+    %   module doc for why that matters).
+    (   px_config:current_env(development)
+    ->  px_reload:record_boot_state
+    ;   px_assets:compile_assets
+    ).
 
 prologex_serve :-
     app_port(Port),
@@ -238,9 +249,30 @@ load_dir_modules(Dir) :-
     ;   true
     ).
 
+%   adr/0036: in development the route captures the WHOLE remainder
+%   of the path after /assets/ (router.pl's splat(Name) segment, e.g.
+%   "css/app.css") because dev assets are served unhashed, straight
+%   from assets/ by their logical (possibly nested) name; production
+%   keeps the single flat :file segment -- compile_assets/0 always
+%   hashes to a flat basename (adr/0025), never a nested one. Same
+%   route name and same param key (`file`) either way, so
+%   px_assets:serve_asset/2 (production, untouched by this ADR) and
+%   px_assets:serve_asset_dev/2 (new) both just read Env0.params.file.
+%
+%   px_assets:set_dev_assets/1 records this SAME decision as a fact
+%   (not re-derived from current_env/1 later) for stylesheet_tag/2,
+%   image_tag/3 and javascript_importmap_tags/1 to consult at render
+%   time -- see px_assets.pl's set_dev_assets/1 doc for why re-reading
+%   PROLOGEX_ENV at render time is wrong for an adr/0033 saved binary.
 mount_assets_route :-
-    router:add_route(px_assets_file, get, "/assets/:file",
-                     px_assets:serve_asset).
+    (   px_config:current_env(development)
+    ->  router:add_route(px_assets_file, get, "/assets/*file",
+                         px_assets:serve_asset_dev),
+        px_assets:set_dev_assets(true)
+    ;   router:add_route(px_assets_file, get, "/assets/:file",
+                         px_assets:serve_asset),
+        px_assets:set_dev_assets(false)
+    ).
 
 app_port(Port) :-
     (   px_config:config(port, P) -> Port = P ; Port = 8090 ).
@@ -294,11 +326,20 @@ px_conn(WorkerId, Loop, Client) :-
 %!  px_request(+WorkerId, +Request, +Stream) is det.
 %
 %   Per-request entry: lazily wire this worker thread's database
-%   connection, then run the adr/0017 edge.
+%   connection, give development-mode hot reload (adr/0036) first
+%   look at the request -- a no-op outside development -- then run
+%   the adr/0017 edge. A reload failure (a syntax error in the file
+%   being edited) has already written a plain-text 500 to Stream and
+%   is NOT dispatched further; anything else proceeds exactly as
+%   before this ADR.
 
 px_request(WorkerId, Request, Stream) :-
     ensure_db,
-    px_env:handle_request(Request, Stream, WorkerId).
+    px_reload:maybe_reload(Stream, Handled),
+    (   Handled == true
+    ->  true
+    ;   px_env:handle_request(Request, Stream, WorkerId)
+    ).
 
 %   One connection per worker thread (adr/0020 section 4). The flag is
 %   thread-local, so each worker opens its own connection on its first

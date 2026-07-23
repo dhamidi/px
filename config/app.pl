@@ -18,4 +18,8 @@ config(workers, 2).
 config(database, "data/prologex.db").
 
 %% Environment overlay: applies only when PROLOGEX_ENV=production.
-config(production, database, "/var/lib/prologex/prologex.db").
+%% Env-driven (adr/0022) so a real system install points at
+%% /var/lib via DATABASE_PATH, while this --user sandbox deploy just
+%% keeps the writable local data dir -- no hardcoded system path that
+%% the running user may not be able to create.
+config(production, database, env('DATABASE_PATH', "data/prologex.db")).

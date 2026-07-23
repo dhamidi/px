@@ -3,10 +3,12 @@
             load_manifest/0,
             asset_path/2,          % +Logical, -Path
             serve_asset/2,         % +Env0, -Env  (pipeline/route handler)
+            serve_asset_dev/2,     % +Env0, -Env  (dev route handler, adr/0036)
             stylesheet_tag/2,      % ?Logical, +Stream   (render_helper/2 hook)
             javascript_importmap_tags/1, % +Stream         (render_helper/2 hook)
             image_tag/3,           % ?Logical, ?Attrs, +Stream (render_helper/2 hook)
-            bake_asset_blobs/0     % adr/0033: snapshot public/assets/ into facts
+            bake_asset_blobs/0,    % adr/0033: snapshot public/assets/ into facts
+            set_dev_assets/1       % +Bool -- adr/0036, called once at boot
           ]).
 
 /** <module> The asset pipeline (adr/0025): Propshaft + importmap-rails,
@@ -64,6 +66,35 @@ branch is untouched.
 :- dynamic px_assets_source_dir/1.
 :- prolog_load_context(directory, Dir),
    assertz(px_assets_source_dir(Dir)).
+
+%!  set_dev_assets(+Bool) is det.
+%
+%   adr/0036: whether stylesheet_tag/2, image_tag/3 and
+%   javascript_importmap_tags/1 emit unhashed dev-style URLs or
+%   resolve through the compiled production manifest is a FACT, set
+%   ONCE at boot (prologex.pl's mount_assets_route/0 calls this right
+%   after deciding, the same way and from the same
+%   px_config:current_env(development) check, which route handler to
+%   mount) -- NOT re-derived by calling current_env/1 on every
+%   render. That distinction matters for adr/0033 single-binary
+%   builds: qsave_program/2 snapshots this fact (it is ordinary
+%   Prolog heap state) but cannot snapshot an OS environment variable,
+%   so a moved binary's PROLOGEX_ENV at serve time is whatever the
+%   deploying shell happens to have (usually unset) -- unrelated to
+%   what `px build` forced it to while loading (px_build.pl sets
+%   PROLOGEX_ENV=production for exactly this reason). Re-deriving
+%   from current_env/1 at render time was caught by hand producing a
+%   built, production binary whose HTML still referenced unhashed
+%   dev-style asset URLs even though serve_asset/2 -- baked into the
+%   route table at the same boot -- correctly only serves hashed
+%   ones, a 404-in-production regression. This flag is the fix: one
+%   decision, made once, consulted everywhere.
+:- dynamic dev_assets/0.
+
+set_dev_assets(true)  :- !, ( dev_assets -> true ; assertz(dev_assets) ).
+set_dev_assets(false) :- retractall(dev_assets).
+
+dev_assets_mode :- dev_assets.
 
            /*******************************
            *          LOCATIONS           *
@@ -421,6 +452,48 @@ serve_asset(Env0, Env) :-
     ;   not_found(Env0, Env)
     ).
 
+%!  serve_asset_dev(+Env0, -Env) is det.
+%
+%   adr/0036: the development route handler for `get "/assets/*file"`
+%   (mounted instead of serve_asset/2 -- see prologex.pl's
+%   mount_assets_route/0 -- so serve_asset/2 above, and every test
+%   that calls it directly, is completely untouched by this). File is
+%   the WHOLE remainder of the path after "/assets/" (router.pl's
+%   splat(Name) segment joins nested segments with "/", e.g.
+%   "css/app.css"), served straight from assets/<File> on disk,
+%   unhashed, with no manifest lookup and no compile step -- so a
+%   source edit is visible on the very next request. `cache-control:
+%   no-cache, ...` (never `immutable`, unlike production: the URL
+%   does not change when the content does, so a cached copy would be
+%   wrong the moment the file is saved again). No gzip negotiation
+%   either -- that is a production optimisation (adr/0025), pointless
+%   for a localhost dev loop. A ".." anywhere in the requested path is
+%   rejected outright (assets/ has no manifest whitelist in dev, so
+%   this is the only guard against escaping assets/ via the path).
+serve_asset_dev(Env0, Env) :-
+    File = Env0.params.file,
+    to_string(File, FileS),
+    (   safe_dev_asset_path(FileS)
+    ->  assets_source_dir(SrcDir),
+        atomic_list_concat([SrcDir, '/', FileS], Path),
+        (   exists_file(Path)
+        ->  content_type(FileS, ContentType),
+            read_file_to_string(Path, Bytes, [encoding(iso_latin_1)]),
+            respond(Env0, raw_bytes(Bytes),
+                    [ header("content-type", ContentType),
+                      header("cache-control", "no-cache, no-store, must-revalidate")
+                    ], Env)
+        ;   not_found(Env0, Env)
+        )
+    ;   not_found(Env0, Env)
+    ).
+
+%   No ".." path segment anywhere -- the one guard dev mode needs
+%   since, unlike production, there is no manifest whitelist gating
+%   what gets served.
+safe_dev_asset_path(FileS) :-
+    \+ sub_string(FileS, _, _, _, "..").
+
 gz_blob_key(File, GzKey) :-
     (   string(File) -> FileS = File ; atom_string(File, FileS) ),
     string_concat(FileS, ".gz", GzKey).
@@ -466,16 +539,34 @@ ext_content_type(txt,   "text/plain; charset=utf-8").
            *      TEMPLATE HELPERS        *
            *******************************/
 
+%!  resolved_asset_path(+Logical, -Path) is det.
+%
+%   adr/0036: the one branch point stylesheet_tag/2 and image_tag/3
+%   share. In development, the unhashed logical URL straight under
+%   /assets/ (matched by serve_asset_dev/2's "/assets/*file" route --
+%   no manifest lookup needed, so this works even though development
+%   never runs compile_assets/0); in production, the hashed,
+%   fingerprinted URL from the compiled manifest (asset_path/2,
+%   adr/0025), unchanged.
+resolved_asset_path(Logical, Path) :-
+    (   dev_assets_mode
+    ->  to_string(Logical, LogicalS),
+        format(string(Path), "/assets/~w", [LogicalS])
+    ;   asset_path(Logical, Path)
+    ).
+
 %!  stylesheet_tag(+Logical, +Stream) is det.
 %
 %   px_template:render_helper/2 registration: bare call
 %   `stylesheet_tag("css/app.css")` in a template body renders
-%   `<link rel="stylesheet" href="/assets/app-<hash>.css">`.
+%   `<link rel="stylesheet" href="/assets/app-<hash>.css">` in
+%   production, `<link rel="stylesheet" href="/assets/css/app.css">`
+%   (unhashed) in development.
 :- multifile px_template:render_helper/2.
 :- dynamic   px_template:render_helper/2.
 
 stylesheet_tag(Logical, S) :-
-    asset_path(Logical, Path),
+    resolved_asset_path(Logical, Path),
     px_template:render(S, link([rel(stylesheet), href(Path)])).
 
 px_template:render_helper(stylesheet_tag(Logical), S) :-
@@ -487,7 +578,7 @@ px_template:render_helper(stylesheet_tag(Logical), S) :-
 %   `<img src="/assets/logo-<hash>.png" class="logo">`. image_tag/2
 %   (no extra attrs) is also registered.
 image_tag(Logical, Attrs, S) :-
-    asset_path(Logical, Path),
+    resolved_asset_path(Logical, Path),
     px_template:render(S, img([src(Path)|Attrs])).
 
 px_template:render_helper(image_tag(Logical), S) :-
@@ -517,12 +608,17 @@ px_template:render_helper(image_tag(Logical, Attrs), S) :-
 %        therefore compiled to "js/app.js" in the manifest); apps
 %        with no app.js get only the import map.
 javascript_importmap_tags(S) :-
-    ensure_manifest_loaded,
-    findall(Bare-Path, js_import_entry(Bare, Path), Entries),
+    (   dev_assets_mode
+    ->  findall(Bare-Path, js_import_entry_dev(Bare, Path), Entries),
+        dev_app_js_exists(HasAppJs)
+    ;   ensure_manifest_loaded,
+        findall(Bare-Path, js_import_entry(Bare, Path), Entries),
+        (   manifest_entry("js/app.js", _) -> HasAppJs = true ; HasAppJs = false )
+    ),
     imports_json(Entries, Json),
     format(string(ImportMap), "{\"imports\": ~w}", [Json]),
     px_template:render(S, script(type(importmap), raw(ImportMap))),
-    (   manifest_entry("js/app.js", _)
+    (   HasAppJs == true
     ->  px_template:render(S, script(type(module), raw("import \"app\";")))
     ;   true
     ).
@@ -537,6 +633,31 @@ js_import_entry(Bare, Path) :-
     atom_concat(BareA, '.js', BareA0),
     atom_string(BareA, Bare),
     format(string(Path), "/assets/~w", [Hashed]).
+
+%!  js_import_entry_dev(-Bare, -Path) is nondet.
+%
+%   adr/0036 development equivalent of js_import_entry/2: walks
+%   assets/js/ on disk directly (no manifest, no compile step) for
+%   every "*.js" file, one solution per file, Bare the module's bare
+%   import name ("turbo", "components/foo") and Path its unhashed
+%   /assets/js/... URL (served by serve_asset_dev/2).
+js_import_entry_dev(Bare, Path) :-
+    assets_source_dir(SrcDir),
+    atomic_list_concat([SrcDir, '/js'], JsDir),
+    exists_directory(JsDir),
+    directory_member(JsDir, FilePath, [recursive(true)]),
+    exists_file(FilePath),
+    file_name_extension(_, js, FilePath),
+    relative_logical_name(JsDir, FilePath, RelLogical),
+    atom_string(RelLogicalA, RelLogical),
+    atom_concat(BareA, '.js', RelLogicalA),
+    atom_string(BareA, Bare),
+    format(string(Path), "/assets/js/~w", [RelLogical]).
+
+dev_app_js_exists(HasAppJs) :-
+    assets_source_dir(SrcDir),
+    atomic_list_concat([SrcDir, '/js/app.js'], AppJsPath),
+    (   exists_file(AppJsPath) -> HasAppJs = true ; HasAppJs = false ).
 
 %!  imports_json(+Pairs, -Json) is det.
 %

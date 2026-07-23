@@ -145,6 +145,7 @@ segments_path(Segments, Path) :-
     atomic_list_concat([''|Parts], '/', Path).
 
 segment_str(param(N), S) :- !, atom_concat(':', N, S).
+segment_str(splat(N), S) :- !, atom_concat('*', N, S).
 segment_str(S, S).
 
 

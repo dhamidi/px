@@ -44,6 +44,15 @@ calls it.
 %   alias when qsave_program/2 fails.
 build(Options) :-
     out_file(Options, File),
+    %   adr/0036: a build is production BY CONSTRUCTION, not by
+    %   whatever PROLOGEX_ENV the operator's shell happens to have --
+    %   prologex_load/0 now only compiles/hashes assets (adr/0025) and
+    %   skips them entirely in development, so without this a `px
+    %   build` run from a plain dev shell (PROLOGEX_ENV unset) would
+    %   produce a binary with no public/assets/ at all. Forcing it
+    %   here, before prologex_load/0 runs, is what makes "production
+    %   by construction" actually true rather than just documented.
+    setenv('PROLOGEX_ENV', production),
     format(user_error, "px build: loading application...~n", []),
     prologex:prologex_load,
     format(user_error, "px build: baking asset blobs...~n", []),
