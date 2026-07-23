@@ -29,10 +29,13 @@ Instead, the clone bootstraps itself:
    `build`) build `c/` automatically when any shared object is
    missing — announced, once, needing only cc, make and libuv.
    `px new`, `help` and `version` work with swipl alone.
-3. The Makefile finds libuv through pkg-config when available
-   (Homebrew ships a `libuv.pc`), falling back to `-luv` where the
-   default paths suffice (Debian). Compilation and linking go
-   through `swipl-ld`, which owns the platform specifics.
+3. The Makefile finds libuv through pkg-config when available,
+   then through the stable Homebrew keg symlink
+   (`/opt/homebrew/opt/libuv`, `/usr/local/opt/libuv`) — the first
+   real Mac clone proved Homebrew installs no pkg-config by default
+   — and only then assumes default paths with `-luv` (Debian).
+   Compilation and linking go through `swipl-ld`, which owns the
+   platform specifics.
 
 4. **`px install [DIR]`** (default `~/.local/bin`, never sudo) puts
    px on the PATH -- not a symlink but a two-line shim with the

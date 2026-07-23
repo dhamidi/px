@@ -1,13 +1,21 @@
 SWIPL_LD = swipl-ld
 CFLAGS   = -Wall -Wextra -O2 -I../vendor/llhttp
 
-# libuv via pkg-config when available -- Homebrew on macOS (notably
-# /opt/homebrew on Apple Silicon) is not on the default search paths;
-# Debian's libuv1-dev is, so plain -luv is the fallback (adr/0034).
+# libuv discovery (adr/0034): pkg-config first; but Homebrew installs
+# no pkg-config by default (the first real Mac clone proved it), so
+# fall back to the stable Homebrew keg symlink -- /opt/homebrew/opt
+# on Apple Silicon, /usr/local/opt on Intel -- before assuming the
+# default search paths (Debian's libuv1-dev) suffice with plain -luv.
 UV_CFLAGS := $(shell pkg-config --cflags libuv 2>/dev/null)
 UV_LIBS   := $(shell pkg-config --libs libuv 2>/dev/null)
 ifeq ($(strip $(UV_LIBS)),)
-UV_LIBS = -luv
+  UV_PREFIX := $(firstword $(wildcard /opt/homebrew/opt/libuv /usr/local/opt/libuv))
+  ifneq ($(strip $(UV_PREFIX)),)
+    UV_CFLAGS = -I$(UV_PREFIX)/include
+    UV_LIBS   = -L$(UV_PREFIX)/lib -luv
+  else
+    UV_LIBS = -luv
+  endif
 endif
 
 # adr/0020: serialized threading mode as belt and braces; drop the
