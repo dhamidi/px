@@ -24,6 +24,14 @@ with an explicit export list means every predicate below is reliably
 importable from any module via use_module/1, regardless of load order.
 */
 
+%   Load through the `foreign` alias, not a raw path: qsave's
+%   foreign(save) can only embed alias-loaded libraries (adr/0033),
+%   and adr/0030 wants the location expressed, not computed.
 :- prolog_load_context(directory, Dir),
-   atomic_list_concat([Dir, '/../c/sqlite3_swi'], LibBase),
-   use_foreign_library(LibBase).
+   atomic_list_concat([Dir, '/../c'], CRel),
+   absolute_file_name(CRel, CDir),
+   (   user:file_search_path(foreign, CDir)
+   ->  true
+   ;   assertz(user:file_search_path(foreign, CDir))
+   ),
+   use_foreign_library(foreign(sqlite3_swi)).

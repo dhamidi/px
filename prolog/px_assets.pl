@@ -5,7 +5,8 @@
             serve_asset/2,         % +Env0, -Env  (pipeline/route handler)
             stylesheet_tag/2,      % ?Logical, +Stream   (render_helper/2 hook)
             javascript_importmap_tags/1, % +Stream         (render_helper/2 hook)
-            image_tag/3            % ?Logical, ?Attrs, +Stream (render_helper/2 hook)
+            image_tag/3,           % ?Logical, ?Attrs, +Stream (render_helper/2 hook)
+            bake_asset_blobs/0     % adr/0033: snapshot public/assets/ into facts
           ]).
 
 /** <module> The asset pipeline (adr/0025): Propshaft + importmap-rails,
@@ -33,6 +34,16 @@ write_response/2 extension for this ADR), which switches the one-shot
 response stream to octet encoding before writing so the bytes are not
 re-encoded as UTF-8 on the wire. This is what lets a gzip'd asset's
 compressed bytes survive the trip unchanged.
+
+Baking (adr/0033): bake_asset_blobs/0 reads every file under
+public/assets/ -- hashed originals, gzip siblings, the manifest --
+into asset_blob/2 facts, the same iso_latin_1 byte-string shape as
+above, so `px build`'s qsave_program/2 snapshots them as part of the
+Prolog database. serve_asset/2 falls back to a blob when the disk
+file is absent, which is the normal case once the app runs as a
+moved single binary with no public assets files beside it at all --
+the disk path (a dev checkout) always wins when present, and that
+branch is untouched.
 */
 
 :- use_module(library(filesex)).
@@ -228,6 +239,51 @@ write_manifest(Pairs) :-
 
 
            /*******************************
+           *   BAKING (adr/0033 BUILD)    *
+           *******************************/
+
+%   asset_blob(RelPath, Bytes): RelPath is a file's path relative to
+%   public/assets/, forward-slash separated, as a string (e.g.
+%   "app-<hash>.css", "app-<hash>.css.gz", ".manifest.json"); Bytes is
+%   its content, iso_latin_1-decoded like every other read in this
+%   file -- an isomorphic byte<->code-point string, ready to hand
+%   straight to px_env's raw_bytes/1 response body. Populated by
+%   bake_asset_blobs/0, part of the dynamic database px build's
+%   qsave_program/2 snapshots.
+:- dynamic asset_blob/2.
+
+%!  bake_asset_blobs is det.
+%
+%   Read every regular file under public/assets/ (recursively --
+%   hashed originals, ".gz" siblings, ".manifest.json", whatever
+%   compile_assets/0 left there) into an asset_blob/2 fact, replacing
+%   any previous set. A no-op (zero facts) when public/assets/ does
+%   not exist -- fine for a build run before compile_assets/0 ever
+%   created it, though `px build` always runs this after
+%   prologex_load/0, which does not skip it either way.
+bake_asset_blobs :-
+    retractall(asset_blob(_, _)),
+    public_assets_dir(Dir),
+    (   exists_directory(Dir)
+    ->  findall(Rel-Bytes, blob_source(Dir, Rel, Bytes), Pairs)
+    ;   Pairs = []
+    ),
+    forall(member(Rel-Bytes, Pairs), assertz(asset_blob(Rel, Bytes))),
+    length(Pairs, N),
+    maplist([_-B,L]>>string_length(B, L), Pairs, Lengths),
+    sum_list(Lengths, TotalBytes),
+    TotalKB is TotalBytes / 1024,
+    format(user_error, "px_assets: baked ~w asset blob(s), ~1f KB~n",
+           [N, TotalKB]).
+
+blob_source(Dir, Rel, Bytes) :-
+    directory_member(Dir, Path, [recursive(true)]),
+    exists_file(Path),
+    relative_logical_name(Dir, Path, Rel),
+    read_file_to_string(Path, Bytes, [encoding(iso_latin_1)]).
+
+
+           /*******************************
            *      MANIFEST (IN MEMORY)    *
            *******************************/
 
@@ -328,10 +384,33 @@ serve_asset(Env0, Env) :-
                     [ header("content-type", ContentType),
                       header("cache-control", CacheControl)
                     ], Env)
+        %   adr/0033 fallback: no disk file (a moved single-binary
+        %   build has no public/assets/ tree at all) but the content
+        %   rode into the saved state as an asset_blob/2 fact -- same
+        %   headers, same gzip negotiation, disk always wins above
+        %   when present.
+        ;   accepts_gzip(Env0),
+            gz_blob_key(File, GzKey),
+            asset_blob(GzKey, Bytes)
+        ->  respond(Env0, raw_bytes(Bytes),
+                    [ header("content-type", ContentType),
+                      header("cache-control", CacheControl),
+                      header("content-encoding", "gzip"),
+                      header("vary", "accept-encoding")
+                    ], Env)
+        ;   asset_blob(File, Bytes)
+        ->  respond(Env0, raw_bytes(Bytes),
+                    [ header("content-type", ContentType),
+                      header("cache-control", CacheControl)
+                    ], Env)
         ;   not_found(Env0, Env)
         )
     ;   not_found(Env0, Env)
     ).
+
+gz_blob_key(File, GzKey) :-
+    (   string(File) -> FileS = File ; atom_string(File, FileS) ),
+    string_concat(FileS, ".gz", GzKey).
 
 accepts_gzip(Env0) :-
     get_dict(headers, Env0, Headers),
