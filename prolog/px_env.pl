@@ -56,10 +56,8 @@ the whole config is never snapshotted into the env), response
 %   parallel; load it when its source exists so write_response/2 can
 %   call px_template:render/2. When absent, rendering a non-none body
 %   raises an existence error -- tests may stub px_template:render/2.
-:- prolog_load_context(directory, Dir),
-   atomic_list_concat([Dir, '/px_template'], TemplateSpec),
-   (   exists_source(TemplateSpec)
-   ->  use_module(TemplateSpec)
+:- (   exists_source(px_template)
+   ->  use_module(px_template)
    ;   true
    ).
 

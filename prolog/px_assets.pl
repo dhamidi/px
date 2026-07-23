@@ -43,11 +43,8 @@ compressed bytes survive the trip unchanged.
 :- use_module(library(lists)).
 :- use_module(library(error)).
 
-:- prolog_load_context(directory, Dir),
-   atomic_list_concat([Dir, '/px_env'],      EnvSpec),
-   atomic_list_concat([Dir, '/px_template'], TemplateSpec),
-   use_module(EnvSpec,      [respond/3, respond/4, not_found/2]),
-   use_module(TemplateSpec, [render_tag/4]).
+:- use_module(px_env,      [respond/3, respond/4, not_found/2]).
+:- use_module(px_template, [render_tag/4]).
 
 %   prolog_load_context/2 only answers inside a directive running AT
 %   LOAD TIME -- called later, from an ordinary predicate (repo_root/1

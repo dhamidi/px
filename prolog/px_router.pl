@@ -84,11 +84,8 @@ predicates are an error at registration time.
 :- use_module(library(apply)).
 :- use_module(library(error)).
 
-:- prolog_load_context(directory, Dir),
-   atomic_list_concat([Dir, '/router'], RouterSpec),
-   atomic_list_concat([Dir, '/px_env'], EnvSpec),
-   use_module(RouterSpec),
-   use_module(EnvSpec).
+:- use_module(router).
+:- use_module(px_env).
 
 %   path_helper(Functor, TermArity, Module): the framework-level
 %   helper table of adr/0018.  TermArity is the arity of the TERM app
