@@ -1,10 +1,10 @@
-:- module(adrs,
+:- module(adrs_commands,
           [ adr_slugs/1,            % -Slugs
             adr_markdown/2          % +Slug, -Markdown
           ]).
 
-/** <module> The decision log as a data source (adr/0027 app/lib):
-plain relations, no HTTP anywhere.
+/** <module> The decision log's side effects (adr/0029): this
+feature's commands are file reads. Plain relations, no HTTP anywhere.
 */
 
 :- use_module(library(apply)).
@@ -12,7 +12,8 @@ plain relations, no HTTP anywhere.
 :- use_module(library(readutil)).
 
 %   Where the ADRs live, resolved once at load time relative to this
-%   file (app/lib/ -> repo root -> adr/).
+%   file (app/adrs/ -> repo root -> adr/) -- a legitimate
+%   prolog_load_context use per adr/0030: file location, not imports.
 
 :- dynamic adr_dir/1.
 

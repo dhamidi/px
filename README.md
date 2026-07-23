@@ -19,16 +19,20 @@ forms that validate and re-render themselves, config as a Prolog
 file, and Hotwire/Turbo (frames, streams, progressive enhancement)
 out of the box.
 
-Applications are structured by convention on the Elm Architecture
-rather than MVC (adr/0027): each page is a module giving `model/2`
-(build everything the page needs; failure is the 404), `view/2`
-(pure, Model in, template term out) and — for pages that accept
-messages — `update/4`, a relation from a decoded message and model
-to a new model plus *effects as data* (redirect, turbo streams,
-status), Elm's `Cmd` on the response side. A `:- page(Path)`
-directive wires routes, message dispatch, and a reversible path
-helper; there is no application "main" file at all — `bin/server`
-boots whatever `app/` and `config/` contain.
+Applications are structured on the Elm Architecture rather than MVC,
+grouped by feature like Django apps (adr/0027, adr/0029). A feature
+directory holds its **controller** (the imperative shell: declares
+`:- page(Action, Path)` routes, runs commands, composes domain
+messages), **messages** (HTTP intent: form declarations, validated
+at the edge), a pure **model** (domain messages fold over the model;
+no db, no env, loadable with nothing but SWI), **commands** (every
+side effect, reads and writes, named as verbs), and **views** (pure
+templates). Response effects are data — redirect, turbo streams,
+status — Elm's `Cmd` on the response side. `app/shared/` holds
+cross-feature concerns: the layout and the middleware pipeline
+(logging, auth as plain env relations). There is no application
+"main" file at all — `bin/server` boots whatever `app/` and
+`config/` contain.
 
 The proof of the framework is a real app: `app/` serves this
 project's own [architecture decision log](adr/) — markdown files
@@ -36,8 +40,9 @@ parsed by a hand-written DCG markdown engine, rendered to HTML, and
 served over the framework's own router — plus a sqlite-backed
 guestbook exercising forms, the query builder, and Turbo streams.
 Start reading at `adr/0016-rails-layer-syntax-north-star.md` and
-`adr/0027-app-structure-elm-architecture.md` for the application
-surface, or `app/pages/guestbook.pl` to see it used.
+`adr/0029-features-and-the-controller-layer.md` for the application
+surface, or `app/guestbook/` to see the full five-file feature
+shape.
 
 ## Why it's built the way it is
 
@@ -56,11 +61,13 @@ adr/              one markdown file per decision (also the content the demo app 
 vendor/           vendored amalgamated llhttp + sqlite C sources (adr/0003, adr/0020)
 c/                1:1 C FFI: llhttp_swi.c, uv_swi.c, http_stream_swi.c, sqlite3_swi.c
 prolog/           the framework: the transport core, the Rails layer (px_*.pl),
-                   the TEA page runtime (px_page.pl), px_ui + prolog/ui/, markdown/
-app/              the demo app, in the adr/0027 standard layout:
-  pages/           one Elm-Architecture page per file (model/update/view)
-  views/           shared templates (layout.pl)
-  lib/             plain domain relations (adrs.pl)
+                   the controller runtime (px_controller.pl), px_ui + prolog/ui/,
+                   markdown/
+app/              the demo app, one directory per feature (adr/0029):
+  adrs/            controller.pl, commands.pl, views.pl
+  guestbook/       + messages.pl and a pure model.pl — the full shape
+  ui/              a feature the size of one controller stays one file
+  shared/          cross-feature: layout.pl, middleware.pl (logging + pipeline)
 assets/           css/ + js/ sources for the pipeline (adr/0025)
 config/           app.pl — port, workers, database (adr/0022)
 bin/server        boots the app by convention; deploy/ wraps it for systemd

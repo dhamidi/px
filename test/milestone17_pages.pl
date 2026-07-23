@@ -1,5 +1,6 @@
-/* Milestone 17: TEA pages (prolog/px_page.pl, adr/0027), standalone --
-   no server, no sockets, no database. `:- page(Path)` is user:
+/* Milestone 17: the controller layer (prolog/px_controller.pl,
+   adr/0027 cycle + adr/0029 actions), standalone --
+   no server, no sockets, no database. `:- page(Action, Path, Opts)` is user:
    term_expansion, so it can only be exercised by loading a real page
    MODULE (adr/0027 decision 2: a page is a module); this file writes
    one such fixture module, "widget_page", to a fixed /tmp path at
@@ -13,8 +14,8 @@
    dynamic fact, not the database.
 
    Covers:
-     - :- page/1 expansion: GET route -> px_page:serve_get(widget_page),
-       POST/PATCH/PUT/DELETE routes -> px_page:serve_msg(widget_page),
+     - :- page/2,3 expansion: GET route -> px_controller:serve_get(widget_page, main),
+       POST/PATCH/PUT/DELETE routes -> px_controller:serve_msg(widget_page, main),
        the widget_page_path/2 helper resolving through
        px_router:resolve_path_term/2
      - ensure_layout/0: installs the framework default layout when no
@@ -41,7 +42,7 @@
    atomic_list_concat([Dir, '/../prolog/prologex'], PrologexLib),
    use_module(PrologexLib).            % also wires the library(...) search path
 
-%   Regression note: px_page:ensure_layout/0 asserts into
+%   Regression note: px_controller:ensure_layout/0 asserts into
 %   px_template:tmpl/2 at runtime, which requires that predicate to be
 %   dynamic as well as multifile. Writing this test caught it declared
 %   multifile-only -- making the assertz throw permission_error(modify,
@@ -57,7 +58,7 @@
 		 *******************************/
 
 %   widget_page.pl is written to a fixed /tmp path (never inside the
-%   repo) and loaded with use_module/1, so `:- page/1` and `:- form/2`
+%   repo) and loaded with use_module/1, so `:- page/3` and `:- form/2`
 %   -- both user:term_expansion -- run for real, in their own module,
 %   exactly as app/pages/widgets.pl would load.
 
@@ -66,20 +67,20 @@ widget_page_source(Dir, "
 
 :- use_module(library(prologex)).
 
-:- page(\"/widgets/:id\").
+:- page(main, \"/widgets/:id\", [as(widget_page)]).
 
 :- form(rename, [field(name, text, [required])]).
 
 :- dynamic widget_name/2.
 widget_name(7, \"Widget Seven\").
 
-model(Env, m{id: Id, name: Name}) :-
+model(main, Env, m{id: Id, name: Name}) :-
     IdS = Env.params.id,
     number_string(IdN, IdS),
     widget_name(IdN, Name),
     Id = IdN.
 
-view(M, layout(\"Widget\",
+view(main, M, layout(\"Widget\",
        [ h1([\"Widget #\", M.id]),
          p(M.name)
        ])).
@@ -197,10 +198,10 @@ capture_response(Env, Out) :-
 
 test(page_registers_routes_and_helper) :-
     router:match_route(get, "/widgets/7", GetHandler, _GetParams),
-    GetHandler == px_page:serve_get(widget_page),
+    GetHandler == px_controller:serve_get(widget_page, main),
     forall(member(Verb, [post, patch, put, delete]),
            (   router:match_route(Verb, "/widgets/7", MsgHandler, _),
-               MsgHandler == px_page:serve_msg(widget_page)
+               MsgHandler == px_controller:serve_msg(widget_page, main)
            )),
     px_router:resolve_path_term(widget_page_path(7), Path),
     Path == "/widgets/7".
@@ -218,7 +219,7 @@ test(page_registers_routes_and_helper) :-
 %   rendering.
 test(ensure_layout_installs_default) :-
     \+ clause(px_template:tmpl(layout(_, _), _), _),
-    px_page:ensure_layout,
+    px_controller:ensure_layout,
     clause(px_template:tmpl(layout(_, _), _), _),
     px_template:render_to_string(layout("T", p("x")), Html),
     contains(Html, "<meta charset"),
@@ -232,7 +233,7 @@ test(ensure_layout_installs_default) :-
 
 test(get_cycle_renders_model) :-
     get_env("/widgets/7", "7", Env0),
-    px_page:serve_get(widget_page, Env0, Env),
+    px_controller:serve_get(widget_page, main, Env0, Env),
     Env.response.status == 200,
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 200 OK"),
@@ -241,7 +242,7 @@ test(get_cycle_renders_model) :-
 
 test(model_failure_is_404) :-
     get_env("/widgets/999", "999", Env0),
-    px_page:serve_get(widget_page, Env0, Env),
+    px_controller:serve_get(widget_page, main, Env0, Env),
     Env.response.status == 404,
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 404 Not Found"),
@@ -254,7 +255,7 @@ test(model_failure_is_404) :-
 
 test(message_rename_ok_status_201) :-
     post_env("/widgets/7?_msg=rename&name=Bob", "7", Env0),
-    px_page:serve_msg(widget_page, Env0, Env),
+    px_controller:serve_msg(widget_page, main, Env0, Env),
     Env.response.status == 201,
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 201"),
@@ -263,7 +264,7 @@ test(message_rename_ok_status_201) :-
 
 test(message_rename_invalid_status_422) :-
     post_env("/widgets/7?_msg=rename&name=", "7", Env0),
-    px_page:serve_msg(widget_page, Env0, Env),
+    px_controller:serve_msg(widget_page, main, Env0, Env),
     Env.response.status == 422,
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 422").
@@ -273,7 +274,7 @@ test(message_rename_invalid_status_422) :-
 test(single_form_fallback) :-
     post_env("/widgets/7?name=Carol", "7", Env0),
     \+ get_dict('_msg', Env0.params, _),
-    px_page:serve_msg(widget_page, Env0, Env),
+    px_controller:serve_msg(widget_page, main, Env0, Env),
     Env.response.status == 201,
     capture_response(Env, Out),
     contains(Out, "Carol"),
@@ -284,12 +285,12 @@ test(single_form_fallback) :-
 %   poke/1 has no matching :- form(poke, ...) at all.
 test(formless_message_decodes_to_params) :-
     post_env("/widgets/7?_msg=poke&foo=bar", "7", Env0),
-    px_page:decode_msg(widget_page, Env0, Msg),
+    px_controller:decode_msg(widget_page, Env0, Msg),
     Msg = poke(ParamsDict),
     is_dict(ParamsDict),
     get_dict('_msg', ParamsDict, "poke"),
     get_dict(foo, ParamsDict, "bar"),
-    px_page:serve_msg(widget_page, Env0, Env),
+    px_controller:serve_msg(widget_page, main, Env0, Env),
     Env.response.status == 204,
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 204").
@@ -298,7 +299,7 @@ test(formless_message_decodes_to_params) :-
 %   generated helper uses -- 303 + location, no body rendered.
 test(redirect_effect) :-
     post_env("/widgets/7?_msg=go", "7", Env0),
-    px_page:serve_msg(widget_page, Env0, Env),
+    px_controller:serve_msg(widget_page, main, Env0, Env),
     Env.response.status == 303,
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 303 See Other"),
@@ -308,8 +309,8 @@ test(redirect_effect) :-
 %   domain_error -- typos fail loudly, not silently (adr/0027 decision 4).
 test(unknown_effect_is_domain_error) :-
     post_env("/widgets/7?_msg=boom", "7", Env0),
-    catch(( px_page:serve_msg(widget_page, Env0, _Env),
+    catch(( px_controller:serve_msg(widget_page, main, Env0, _Env),
             fail
           ),
-          error(domain_error(px_page_effect, nonsense(x)), _),
+          error(domain_error(px_controller_effect, nonsense(x)), _),
           true).

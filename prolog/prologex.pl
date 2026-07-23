@@ -31,12 +31,12 @@ global term_expansion. On top of that it provides:
         database opens -- the app's schema rides with the app.
 
     prologex_run/0
-        The whole boot (adr/0016, adr/0027). Started in an app
-        directory (bin/server cds there) it needs no app "main" file:
-        load config/app.pl, register the lib/views/pages search-path
-        aliases, mount /assets/:file, load every module under
-        app/lib, app/views and app/pages (in that order -- `:- page`
-        directives register their routes as they load), install the
+        The whole boot (adr/0016, adr/0027, adr/0029). Started in an
+        app directory (bin/server cds there) it needs no app "main"
+        file: load config/app.pl, register the `app` search-path
+        alias, mount /assets/:file, load app/shared/ then every
+        feature directory under app/ (`:- page` directives register
+        their routes as controllers load), install the
         default pipeline when the app declared none, install the
         default mobile-first layout when the app defined no layout/2
         template (px_page:ensure_layout/0), compile the asset
@@ -75,33 +75,20 @@ statements, and installs the connection via px_query:use_db/1
    ;   assertz(user:file_search_path(library, Dir))
    ).
 
-:- prolog_load_context(directory, Dir),
-   atomic_list_concat([Dir, '/px_env'],      EnvSpec),
-   atomic_list_concat([Dir, '/px_query'],    QuerySpec),
-   atomic_list_concat([Dir, '/px_form'],     FormSpec),
-   atomic_list_concat([Dir, '/px_turbo'],    TurboSpec),
-   atomic_list_concat([Dir, '/px_config'],   ConfigSpec),
-   atomic_list_concat([Dir, '/px_template'], TemplateSpec),
-   atomic_list_concat([Dir, '/px_router'],   RouterSpec),
-   atomic_list_concat([Dir, '/px_assets'],   AssetsSpec),
-   atomic_list_concat([Dir, '/px_db'],       DbSpec),
-   atomic_list_concat([Dir, '/px_page'],     PageSpec),
-   atomic_list_concat([Dir, '/px_ui'],       UiSpec),
-   atomic_list_concat([Dir, '/worker'],      WorkerSpec),
-   atomic_list_concat([Dir, '/http_stream'], StreamSpec),
-   reexport(EnvSpec,      [respond/3, respond/4, redirect/3, not_found/2]),
-   reexport(QuerySpec,    [row/2, insert/3, update/3, delete/2, sql/3]),
-   reexport(FormSpec,     [form_result/3, form_validate/3]),
-   reexport(TurboSpec,    [turbo_or_redirect/4, turbo_stream/3, dom_id/2]),
-   reexport(ConfigSpec,   [config/2, require_config/2]),
-   reexport(TemplateSpec, [render_to_string/2]),
-   reexport(AssetsSpec,   [asset_path/2, serve_asset/2]),
-   use_module(RouterSpec, []),         % directives are global term_expansion
-   use_module(DbSpec,     []),
-   use_module(PageSpec,   []),         % :- page directive (adr/0027)
-   use_module(UiSpec,     []),         % component library is framework surface
-   use_module(WorkerSpec, []),
-   use_module(StreamSpec, []).
+%   Sibling references per adr/0030: the spec is the location.
+:- reexport(px_env,      [respond/3, respond/4, redirect/3, not_found/2]).
+:- reexport(px_query,    [row/2, insert/3, update/3, delete/2, sql/3]).
+:- reexport(px_form,     [form_result/3, form_validate/3]).
+:- reexport(px_turbo,    [turbo_or_redirect/4, turbo_stream/3, dom_id/2]).
+:- reexport(px_config,   [config/2, require_config/2]).
+:- reexport(px_template, [render_to_string/2]).
+:- reexport(px_assets,   [asset_path/2, serve_asset/2]).
+:- use_module(px_router,     []).   % directives are global term_expansion
+:- use_module(px_db,         []).
+:- use_module(px_controller, []).   % :- page directive (adr/0027, adr/0029)
+:- use_module(px_ui,         []).   % component library is framework surface
+:- use_module(worker,        []).
+:- use_module(http_stream,   []).
 
 
 		 /*******************************
@@ -165,7 +152,7 @@ prologex_run :-
     mount_assets_route,
     load_app_tree,
     ensure_pipeline,
-    px_page:ensure_layout,
+    px_controller:ensure_layout,
     px_assets:compile_assets,
     app_port(Port),
     app_workers(Workers),
@@ -183,36 +170,50 @@ load_app_config :-
     ;   true
     ).
 
-%   The adr/0027 conventions. ensure_app_paths makes
-%   `:- use_module(lib(adrs))` etc. resolve inside app modules;
-%   load_app_tree loads the standard directories in dependency order
-%   (lib before views before pages -- pages import the others);
-%   mount_assets_route serves the pipeline without the app writing a
-%   route for it. All three are no-ops for whatever the app directory
-%   does not contain.
+%   The adr/0029 conventions. ensure_app_paths registers the `app`
+%   alias so `:- use_module(app(guestbook/model))` resolves inside
+%   app modules (adr/0030); load_app_tree loads app/shared/ first
+%   (layout, middleware), then every feature directory --
+%   use_module/1 deduplicates, so a controller pulling in its
+%   feature's files early is fine; mount_assets_route serves the
+%   pipeline without the app writing a route for it. All are no-ops
+%   for whatever the app directory does not contain.
 
 ensure_app_paths :-
-    forall(member(Alias-Rel, [lib-'app/lib', views-'app/views', pages-'app/pages']),
-           (   exists_directory(Rel)
-           ->  absolute_file_name(Rel, Abs),
-               (   user:file_search_path(Alias, Abs)
-               ->  true
-               ;   assertz(user:file_search_path(Alias, Abs))
-               )
-           ;   true
-           )).
+    (   exists_directory(app)
+    ->  absolute_file_name(app, Abs),
+        (   user:file_search_path(app, Abs)
+        ->  true
+        ;   assertz(user:file_search_path(app, Abs))
+        )
+    ;   true
+    ).
 
 load_app_tree :-
-    forall(member(Dir, ['app/lib', 'app/views', 'app/pages']),
-           load_dir_modules(Dir)).
+    load_dir_modules('app/shared'),
+    (   exists_directory(app)
+    ->  directory_files(app, Entries),
+        msort(Entries, Sorted),
+        forall(( member(E, Sorted),
+                 \+ memberchk(E, ['.', '..', shared]),
+                 directory_file_path(app, E, FeatureDir),
+                 exists_directory(FeatureDir)
+               ),
+               load_dir_modules(FeatureDir))
+    ;   true
+    ).
 
+%   load_files/2, not use_module/1: the boot loader LOADS app
+%   modules, it does not import their exports anywhere -- two
+%   features both exporting update/3 (a domain fold, adr/0029) must
+%   not collide in the loader's namespace.
 load_dir_modules(Dir) :-
     (   exists_directory(Dir)
     ->  directory_files(Dir, Files),
         msort(Files, Sorted),
         forall(( member(F, Sorted), file_name_extension(_, pl, F) ),
                ( directory_file_path(Dir, F, Path),
-                 use_module(user:Path)
+                 load_files(user:Path, [must_be_module(true), if(not_loaded)])
                ))
     ;   true
     ).
