@@ -74,11 +74,23 @@ bin/server        boots the app by convention; deploy/ wraps it for systemd
 test/             milestone proofs for each layer, run for real, not just written
 ```
 
-## Running it
+## Getting started from a fresh clone
+
+Two packages, then px bootstraps itself (adr/0034) — the C bindings
+build automatically on the first command that needs them:
 
 ```sh
-cd c && make          # once: build the FFI shared objects
-bin/px server         # boot the demo app
+# macOS:  brew install swi-prolog libuv
+# Debian: apt install swi-prolog-nox libuv1-dev build-essential
+
+git clone https://github.com/dhamidi/px && px/bin/px new myapp
+cd myapp && bin/px server
+```
+
+## Running this repo's demo app
+
+```sh
+bin/px server         # boots the ADR browser + guestbook + /ui
 ```
 
 The `px` CLI (adr/0032) is the developer surface:

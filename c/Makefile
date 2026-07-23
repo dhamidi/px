@@ -1,6 +1,14 @@
 SWIPL_LD = swipl-ld
 CFLAGS   = -Wall -Wextra -O2 -I../vendor/llhttp
-LDLIBS_UV = -luv
+
+# libuv via pkg-config when available -- Homebrew on macOS (notably
+# /opt/homebrew on Apple Silicon) is not on the default search paths;
+# Debian's libuv1-dev is, so plain -luv is the fallback (adr/0034).
+UV_CFLAGS := $(shell pkg-config --cflags libuv 2>/dev/null)
+UV_LIBS   := $(shell pkg-config --libs libuv 2>/dev/null)
+ifeq ($(strip $(UV_LIBS)),)
+UV_LIBS = -luv
+endif
 
 # adr/0020: serialized threading mode as belt and braces; drop the
 # runtime extension loader (also drops the -ldl link requirement).
@@ -12,7 +20,7 @@ CFLAGS_SQLITE = -DSQLITE_THREADSAFE=1 -DSQLITE_OMIT_LOAD_EXTENSION \
 all: uv_swi.so llhttp_swi.so http_stream_swi.so sqlite3_swi.so
 
 uv_swi.so: uv_swi.c
-	$(SWIPL_LD) -shared -o $@ $(CFLAGS) $< $(LDLIBS_UV)
+	$(SWIPL_LD) -shared -o $@ $(CFLAGS) $(UV_CFLAGS) $< $(UV_LIBS)
 
 llhttp_swi.so: llhttp_swi.c ../vendor/llhttp/llhttp.c ../vendor/llhttp/api.c ../vendor/llhttp/http.c
 	$(SWIPL_LD) -shared -o $@ $(CFLAGS) $^

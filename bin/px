@@ -1,8 +1,39 @@
 #!/usr/bin/env bash
 #
 # bin/px -- the prologex command line (adr/0032).
+#
+# px is an executable-over-swipl, deliberately not a compiled binary
+# (adr/0034): apps load the framework SOURCE at runtime, so a
+# standalone px could not carry what they need. A fresh clone
+# bootstraps itself -- the C bindings build on the first command that
+# needs them.
+#
 # Framework home is this script's own tree; PX_HOME overrides.
 set -euo pipefail
 
 PX_HOME="${PX_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
+if ! command -v swipl >/dev/null 2>&1; then
+    echo "px: SWI-Prolog is required." >&2
+    case "$(uname -s)" in
+        Darwin) echo "     brew install swi-prolog libuv" >&2 ;;
+        *)      echo "     apt install swi-prolog-nox libuv1-dev build-essential" >&2 ;;
+    esac
+    exit 1
+fi
+
+# Commands that run the framework need c/*.so; build them once
+# (adr/0034). `px new`, help and version work with swipl alone.
+case "${1:-}" in
+    server|routes|console|build)
+        for so in uv_swi llhttp_swi http_stream_swi sqlite3_swi; do
+            if [ ! -e "$PX_HOME/c/$so.so" ]; then
+                echo "px: first run -- building the C bindings (once; needs cc, make, libuv)" >&2
+                make -C "$PX_HOME/c" >&2
+                break
+            fi
+        done
+        ;;
+esac
+
 exec swipl -q -g px_cli:cli "$PX_HOME/prolog/px_cli.pl" -- "$@"
