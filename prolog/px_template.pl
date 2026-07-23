@@ -129,7 +129,37 @@ expand_template(Head, Body, (px_template:tmpl(Head, T) :- T = Body)) :-
                     context(px_template:(~>)/2,
                             'template may not be named after a whitelisted HTML5 element: bare calls resolve element-first, so it could never be called')))
     ;   true
+    ),
+    reject_control_constructs(Head, Body).
+
+%!  reject_control_constructs(+Head, +Body) is det.
+%
+%   A template body is DATA: (Cond -> Then ; Else), ;/2 and \+/1
+%   inside it would never execute -- T = Body captures them as inert
+%   terms that crash at render time, on whichever branch the test
+%   suite didn't exercise. Reject at expansion instead, with the
+%   idiom in the error: write two clauses that match on the argument
+%   (list([]) ~> Empty. / list(Xs) ~> each(Xs, item).), or compute in
+%   the caller and pass the result in.
+
+reject_control_constructs(Head, Body) :-
+    (   sub_term(S, Body),
+        compound(S),
+        compound_name_arity(S, F, A),
+        control_functor(F, A)
+    ->  functor(Head, Name, Arity),
+        format(atom(Msg),
+               'the body of template ~w/~w contains (~w)/~w, which never executes in a template: bodies are data. Match on the argument with two clauses instead (empty-case clause + each/2 clause), or compute the choice before rendering.',
+               [Name, Arity, F, A]),
+        throw(error(permission_error(define, template, Name),
+                    context(px_template:(~>)/2, Msg)))
+    ;   true
     ).
+
+control_functor(;, 2).
+control_functor(->, 2).
+control_functor(*->, 2).
+control_functor(\+, 1).
 
 %!  reject_element_named_helper(+Goal) is failure.
 %

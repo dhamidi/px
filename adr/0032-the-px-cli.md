@@ -27,15 +27,22 @@ One executable, `bin/px`, a thin shell exec into
 
 Principles:
 
-1. **Scaffolds emit the adr/0029 shapes** — `px new` produces
-   `config/app.pl`, `app/shared/layout.pl` (viewport tag included,
-   adr/0028), `app/shared/middleware.pl` (logging + the default
-   pipeline spelled out), a `welcome` feature with one controller,
-   `assets/css/app.css`, `bin/`, `data/`, `.gitignore`. The
-   generated app boots and serves immediately: `cd myapp && bin/px
-   server`. `px generate feature guestbook` writes controller.pl,
-   messages.pl, model.pl, commands.pl, views.pl with the guestbook
-   ADR examples as commented skeletons — the docs are the templates.
+1. **Scaffolds are self-documenting working examples** (rule
+   hardened after the blog dogfooding run): `px generate feature
+   posts [field:widget ...]` emits a COMPLETE resource —
+   list/show/new/create/edit/update/destroy, validation, 422
+   re-render, safe id parsing — that serves correctly with zero
+   edits, and whose comments teach every convention in user
+   language: the request cycle, failure-is-404, forms validated
+   before update, form-posts-to-the-page-that-renders-it, route
+   declaration order, the no-if-then-else template idiom, global
+   template/path-helper resolution, and why the domain fold is
+   called module-qualified. **Generated files never reference ADRs
+   or any framework-internal document** — a user must never need
+   the framework source or its decision log to work on their app.
+   `px new` follows the same rules for `config/app.pl`, the layout
+   (viewport tag), the middleware pipeline, and a `welcome` feature;
+   the generated app boots and serves immediately.
 
 2. **Framework discovery is by location, overridable by
    environment** (adr/0030's principle applied to the CLI): `px`

@@ -4,6 +4,7 @@
             respond/4,            % +Env0, +Template, +Opts, -Env
             redirect/3,           % +Env0, +PathTerm, -Env
             not_found/2,          % +Env0, -Env
+            path_id/3,            % +Env, +Key, -IntegerId (semidet, never throws)
             env_merge_params/3,   % +Env0, +Dict, -Env
             set_pipeline/1,       % +Goals
             dispatch_env/2,       % +Env0, -Env
@@ -134,6 +135,24 @@ put_param(Name0=Value0, Dict0, Dict) :-
     to_atom(Name0, Name),
     to_string(Value0, Value),
     put_dict(Name, Dict0, Value, Dict).
+
+%!  path_id(+Env, +Key, -Id) is semidet.
+%
+%   The blessed integer-id reader for path params: Env.params.Key as
+%   an integer, FAILING (never throwing) when the segment is absent
+%   or not a number -- so a model/3 clause using it turns
+%   /things/notanumber into the 404 its failure contract promises
+%   (adr/0027), with no catch/3 boilerplate. number_string/2 throws
+%   on garbage, which is exactly the trap this exists to remove.
+
+path_id(Env, Key, Id) :-
+    get_dict(params, Env, Params),
+    get_dict(Key, Params, V),
+    (   integer(V)
+    ->  Id = V
+    ;   catch(number_string(Id, V), _, fail),
+        integer(Id)
+    ).
 
 %!  env_merge_params(+Env0, +Dict, -Env) is det.
 %

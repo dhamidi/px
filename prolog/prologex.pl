@@ -78,7 +78,8 @@ statements, and installs the connection via px_query:use_db/1
    ).
 
 %   Sibling references per adr/0030: the spec is the location.
-:- reexport(px_env,      [respond/3, respond/4, redirect/3, not_found/2]).
+:- reexport(px_env,      [respond/3, respond/4, redirect/3, not_found/2,
+                          path_id/3]).
 :- reexport(px_query,    [row/2, insert/3, update/3, delete/2, sql/3]).
 :- reexport(px_form,     [form_result/3, form_validate/3]).
 :- reexport(px_turbo,    [turbo_or_redirect/4, turbo_stream/3, dom_id/2]).
