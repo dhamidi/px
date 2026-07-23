@@ -224,7 +224,7 @@ model_stats = (
 assert model_marker in content
 content = content.replace(model_marker, model_stats + model_marker, 1)
 
-view_marker = "view(show,  M, post_show(M))."
+view_marker = "view(show,  page(_, post(Id, Title, Body), _, _), post_show(Id, Title, Body))."
 view_stats = "view(stats, M, pre(text(M.info))).\n"
 assert view_marker in content
 content = content.replace(view_marker, view_stats + view_marker, 1)
@@ -232,6 +232,10 @@ content = content.replace(view_marker, view_stats + view_marker, 1)
 with open(path, "w") as f:
     f.write(content)
 PYEOF
+PATCH_STATUS=$?
+if [ "$PATCH_STATUS" -ne 0 ]; then
+  report FAIL "(c) controller.pl patch script" "python3 exited $PATCH_STATUS -- scaffold shape probably drifted, see markers in this script"
+fi
 
 if wait_for_pattern "$DEV_URL/posts/stats" "TOTAL="; then
   report PASS "(c) a new route added to controller.pl is live without restart"
@@ -316,10 +320,16 @@ path = sys.argv[1]
 with open(path) as f:
     c = f.read()
 # Drop a closing paren -- an unambiguous syntax error, not a semantic one.
-c = c.replace("post_index(M) ~>", "post_index(M ~>", 1)
+marker = "post_index(Rows) ~>"
+assert marker in c
+c = c.replace(marker, "post_index(Rows ~>", 1)
 with open(path, "w") as f:
     f.write(c)
 PYEOF
+PATCH_STATUS=$?
+if [ "$PATCH_STATUS" -ne 0 ]; then
+  report FAIL "(e) views.pl syntax-error patch script" "python3 exited $PATCH_STATUS -- scaffold shape probably drifted, see markers in this script"
+fi
 
 sleep 1.5
 BROKEN_RESPONSE=$(curl -s -w '\nHTTP_CODE:%{http_code}' "$DEV_URL/posts")

@@ -124,11 +124,15 @@ handle_shutdown_signal(Signal) :-
         graceful_shutdown(Signal)
     ).
 
-%   A few seconds is "bounded grace period" per adr/0031: long enough for
-%   an in-flight response to finish writing, short enough that a stuck
-%   worker (adr/0006: a blocking handler stalls its whole worker) cannot
-%   make `systemctl stop` hang the way the old SIGKILL workaround was
-%   built to route around in the first place.
+%   The "bounded grace period" per adr/0031: long enough for an
+%   in-flight response to finish writing, short enough that a stuck
+%   worker (adr/0006: a blocking handler stalls its whole worker)
+%   cannot make `systemctl stop` hang the way the old SIGKILL
+%   workaround was built to route around. 5s sits well under the
+%   unit's TimeoutStopSec=15 (adr/0012); a response that genuinely
+%   cannot finish within the window is truncated, by design (the
+%   grace is BOUNDED) -- a client wanting a multi-MB stream to survive
+%   a restart is outside what a bounded drain promises.
 shutdown_grace_seconds(5.0).
 
 graceful_shutdown(Signal) :-

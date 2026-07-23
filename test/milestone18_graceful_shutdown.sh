@@ -107,8 +107,8 @@ build_big_body(Dir, Threshold, Body, Bytes) :-
 on_conn(Id, Loop, Client) :-
     http_stream:handle_connection(user:h, Id, Loop, Client).
 
-h(Request, Stream) :-
-    ( sub_string(Request.url, 0, _, _, "/big")
+h(http_request(_Method, Url, _Headers, _Body), Stream) :-
+    ( sub_string(Url, 0, _, _, "/big")
     -> big_body(Body)
     ;  Body = "pong"
     ),
@@ -140,7 +140,7 @@ EXPECTED_BYTES=$(grep BIG_BODY_BYTES "$SERVER_LOG" | awk '{print $2}')
 
 # --- Confirm it actually serves before touching shutdown ---------------
 
-code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/ping" || echo 000)
+code=$(curl -s --max-time 10 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/ping" || echo 000)
 if [ "$code" = "200" ]; then
   report PASS "GET /ping returns 200 before shutdown"
 else
@@ -150,7 +150,7 @@ fi
 # --- Kick off a slow, still-downloading request, then SIGTERM the exact
 #     server PID while it is in flight. ----------------------------------
 
-timeout 20 curl -s --limit-rate 1500k -o "$BIG_OUT" -w '%{http_code} %{size_download}' \
+timeout 20 curl -s --limit-rate 4000k -o "$BIG_OUT" -w '%{http_code} %{size_download}' \
   "http://127.0.0.1:$PORT/big" > "$BIG_RESULT" 2>"$BIG_CURL_ERR" &
 CURL_PID=$!
 sleep 0.4   # let curl actually connect and start reading before we SIGTERM
