@@ -3,8 +3,10 @@
             respond/3,            % +Env0, +Template, -Env
             respond/4,            % +Env0, +Template, +Opts, -Env
             redirect/3,           % +Env0, +PathTerm, -Env
+            redirect/4,           % +Env0, +PathTerm, +Opts, -Env
             not_found/2,          % +Env0, -Env
             path_id/3,            % +Env, +Key, -IntegerId (semidet, never throws)
+            cookie/3,             % +Env, +Name, -Value (semidet)
             env_merge_params/3,   % +Env0, +Dict, -Env
             set_pipeline/1,       % +Goals
             dispatch_env/2,       % +Env0, -Env
@@ -186,16 +188,23 @@ respond(Env0, Template, Opts, Env) :-
                    _{status: Code, headers: Headers, body: Template}).
 
 %!  redirect(+Env0, +PathTerm, -Env) is det.
+%!  redirect(+Env0, +PathTerm, +Opts, -Env) is det.
 %
 %   303 See Other to PathTerm. PathTerm is evaluated through the
 %   eval_path_term/2 multifile hook (the reversible router registers
 %   it, adr/0018); a plain string or atom passes through as-is. 303 so
 %   that redirects after non-GET forms behave under Turbo (adr/0024).
+%   Opts: header(N, V), may repeat -- sign-in/out redirects carry
+%   their set-cookie here (adr/0035).
 redirect(Env0, PathTerm, Env) :-
+    redirect(Env0, PathTerm, [], Env).
+
+redirect(Env0, PathTerm, Opts, Env) :-
     resolve_path_term(PathTerm, Path),
+    findall(N-V, member(header(N, V), Opts), Extra),
     Env = Env0.put(response,
                    _{status: 303,
-                     headers: ["location"-Path],
+                     headers: ["location"-Path|Extra],
                      body: none}).
 
 resolve_path_term(PathTerm, Path) :-
@@ -212,6 +221,29 @@ resolve_path_term(PathTerm, Path) :-
 %   A 404 with a minimal body term.
 not_found(Env0, Env) :-
     respond(Env0, "404 Not Found", [status(404)], Env).
+
+%!  cookie(+Env, +Name, -Value) is semidet.
+%
+%   Value of the named cookie from the request's cookie header
+%   (adr/0035): Name an atom, Value a string. Fails when there is no
+%   cookie header or no such cookie -- never throws. Parsing per RFC
+%   6265's liberal recipe: split on ";", trim, split each on the
+%   first "=".
+cookie(Env, Name, Value) :-
+    get_dict(headers, Env, Headers),
+    memberchk("cookie"-Raw, Headers),
+    split_string(Raw, ";", " \t", Pairs),
+    member(Pair, Pairs),
+    cookie_pair(Pair, Name, Value),
+    !.
+
+%   Split one "name=value" on its FIRST "=" (values may contain more).
+cookie_pair(Pair, Name, Value) :-
+    once(sub_string(Pair, Before, 1, After, "=")),
+    sub_string(Pair, 0, Before, _, NameS),
+    atom_string(NameA, NameS),
+    NameA == Name,
+    sub_string(Pair, _, After, 0, Value).
 
 
 		 /*******************************

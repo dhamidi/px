@@ -57,6 +57,11 @@ cli :-
 main([new, App|_])                    :- !, cmd_new(App), halt(0).
 main([generate, feature, Name|Fs])    :- !, cmd_generate_feature(Name, Fs), halt(0).
 main([g, feature, Name|Fs])           :- !, cmd_generate_feature(Name, Fs), halt(0).
+%   Framework generators dispatch directly: px generate px:auth.
+main([generate, Name|Fs])             :- sub_atom(Name, 0, 3, _, 'px:'), !,
+                                         cmd_generate_feature(Name, Fs), halt(0).
+main([g, Name|Fs])                    :- sub_atom(Name, 0, 3, _, 'px:'), !,
+                                         cmd_generate_feature(Name, Fs), halt(0).
 main([routes|_])                      :- !, in_app_root(cmd_routes), halt(0).
 main([server|_])                      :- !, in_app_root(prologex:prologex_run).
 main([console|_])                     :- !, in_app_root(cmd_console).
@@ -245,7 +250,31 @@ new_file('README.md',               tpl_readme).
 %   with validation and 422 re-render, edit/update, destroy. It
 %   serves correctly with zero edits; the comments in the generated
 %   files teach the conventions, so they double as the docs.
+%
+%   `px generate px:NAME` runs a generator that SHIPS with the
+%   framework but writes ordinary code into the app (adr/0035) --
+%   px:auth is the first: a full users/sessions authentication
+%   system. Framework generators live in prolog/px_gen_NAME.pl,
+%   loaded on demand, exposing generate/0 run in the app root.
 
+cmd_generate_feature(Name0, _FieldArgs) :-
+    atom_string(NameA, Name0),
+    atom_concat('px:', GenName, NameA),
+    !,
+    (   \+ exists_directory(app)
+    ->  format(user_error, "px: no app/ here -- run inside an application~n", []),
+        halt(1)
+    ;   true
+    ),
+    px_home(Home),
+    atomic_list_concat([Home, '/prolog/px_gen_', GenName], Spec),
+    (   exists_source(Spec)
+    ->  use_module(Spec),
+        atom_concat(px_gen_, GenName, Module),
+        Module:generate
+    ;   format(user_error, "px: no framework generator named px:~w~n", [GenName]),
+        halt(1)
+    ).
 cmd_generate_feature(Name0, FieldArgs) :-
     atom_string(Name, Name0),
     (   \+ exists_directory(app)
@@ -441,9 +470,23 @@ tpl_app_css(_, _, C) :-
   --panel: #161a21;
   --text: #e6e8eb;
   --muted: #9aa4b2;
+  /* Radix Themes' own computed indicator color (rgb(62, 99, 221)),
+    .
+     be a pale sky-blue (#7dd3fc) that was readable with dark (#0f1115)
+     text on top of it; #3E63DD is darker/more saturated and FAILS that
+     same dark-on-accent pairing, hence the three companion vars below. */
   --accent: #3E63DD;
+  /* On-accent foreground: use for any text/glyph painted on top of an
+     --accent-filled background (buttons, checked switch/checkbox/toggle
+     fills, ...). White clears WCAG AA comfortably against #3E63DD. */
   --accent-contrast: #ffffff;
+  /* Hover/active variant of --accent -- a touch lighter, for filled
+     accent surfaces (buttons, checked-state controls) on :hover. */
   --accent-hover: #5472e4;
+  /* Lighter indigo for TEXT usage (links, inline accents) directly on
+     the dark page background -- plain --accent reads too dark/low-
+     contrast for body-copy-sized link text on #0f1115; matches Radix's
+     own lighter indigo link tint on dark themes. */
   --accent-text: #849dff;
   --border: #262b34;
   --code-bg: #1c2129;
@@ -451,7 +494,12 @@ tpl_app_css(_, _, C) :-
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+html {
+  /* Mobile browsers otherwise inflate text after rotation. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 
 body {
   margin: 0;
@@ -462,32 +510,224 @@ body {
   color-scheme: dark;
 }
 
-/* Mobile-first: narrow is the default; widen upward. */
-.page { max-width: 760px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
-@media (min-width: 640px) { .page { padding: 2.5rem 1.5rem 4rem; } }
+/* Mobile-first: the narrow screen is the default; widths
+   and paddings grow under min-width queries, never the reverse. */
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
 
-h1 { font-size: clamp(1.45rem, 4.5vw, 1.8rem); }
+@media (min-width: 640px) {
+  .page {
+    padding: 2.5rem 1.5rem 4rem;
+  }
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.25;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+h1 { font-size: clamp(1.45rem, 4.5vw, 1.8rem); margin-bottom: 0.5rem; }
+h2 { font-size: clamp(1.15rem, 3.5vw, 1.35rem); margin-top: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+h3 { font-size: clamp(1rem, 3vw, 1.1rem); margin-top: 1.75rem; margin-bottom: 0.75rem; }
+
+p { color: var(--text); }
+
 a { color: var(--accent-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* Link + button(_to) rows -- edit/delete next to each other, etc.
+   flex-wrap so a long label never forces horizontal scroll at 390px. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.back { margin-bottom: 1.5rem; }
+
 code {
   background: var(--code-bg);
   padding: 0.15em 0.4em;
   border-radius: 4px;
   font-family: \"SF Mono\", Consolas, Menlo, monospace;
+  font-size: 0.9em;
 }
 
-article.card {
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2rem 0;
+}
+
+/* ---------------------------------------------------------------- */
+/* Forms.       */
+/* ---------------------------------------------------------------- */
+
+form {
+  max-width: 28rem;
+  margin: 1.5rem 0 3rem;
+  padding: 1.25rem;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  margin-bottom: 1rem;
+  border-radius: 12px;
+  /* A hairline top highlight plus a soft drop shadow read as a very
+     slightly raised panel -- the flat-panel-on-flat-page look we kept hitting is otherwise indistinguishable from the
+     page background at a glance. */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-.empty { color: var(--muted); }
-.actions { display: flex; gap: 0.75rem; align-items: center; }
+@media (min-width: 640px) {
+  form {
+    padding: 1.75rem 2rem;
+  }
+}
 
-/* button_to: a single button that IS a form -- no panel, inline. */
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.6rem;
+}
+
+/* The submit button owns its own top margin (below) as the form's
+   one clear \"done, now act\" pause -- so the last field doesn't also
+   add a second, smaller gap on top of it. */
+.field:last-of-type {
+  margin-bottom: 0;
+}
+
+.field label {
+  /* Sentence case, not shouty tiny-caps: humanize/2 already renders
+     \"Title\", \"Commenter\", ... -- text-transform: uppercase fought
+     that casing AND made 0.78rem read as illegibly cramped. Bumped
+     size + a real margin below fixes both at once. */
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+input[type=\"text\"],
+input[type=\"email\"],
+input[type=\"password\"],
+input[type=\"number\"],
+textarea,
+select {
+  width: 100%;
+  max-width: 28rem;
+  min-height: 2.75rem;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  line-height: 1.4;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+input[type=\"text\"]:focus,
+input[type=\"email\"]:focus,
+input[type=\"password\"]:focus,
+input[type=\"number\"]:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.25);
+}
+
+/* A left accent bar groups label + input + error under one visual
+   cue, on top of the input's own red border, so an errored field
+   still reads at a glance even scanning fast down a long form. */
+.field-error {
+  border-left: 3px solid var(--danger);
+  padding-left: 0.75rem;
+}
+
+.field-error input[type=\"text\"],
+.field-error input[type=\"email\"],
+.field-error input[type=\"password\"],
+.field-error input[type=\"number\"],
+.field-error textarea,
+.field-error select {
+  border-color: var(--danger);
+}
+
+.field-error input[type=\"text\"]:focus,
+.field-error input[type=\"email\"]:focus,
+.field-error input[type=\"password\"]:focus,
+.field-error input[type=\"number\"]:focus,
+.field-error textarea:focus,
+.field-error select:focus {
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.25);
+}
+
+p.error {
+  color: var(--danger);
+  font-size: 0.82rem;
+  /* Tight to the input above it (attached), looser from whatever
+     follows (the next field's label) -- .field's own margin-bottom
+     already supplies that trailing space. */
+  margin: 0.45rem 0 0;
+}
+
+form button,
+form input[type=\"submit\"],
+button[type=\"submit\"],
+input[type=\"submit\"] {
+  display: inline-block;
+  /* The one clear \"you're done with the fields\" pause before the
+     submit row (button_to overrides this back to 0 below -- it is
+     not a fielded form). */
+  margin-top: 2rem;
+  background: var(--accent);
+  /* was #0f1115 (dark) -- readable on the old pale #7dd3fc, fails on
+     the new saturated #3E63DD indigo; --accent-contrast is white. */
+  color: var(--accent-contrast);
+  border: none;
+  border-radius: 8px;
+  padding: 0.7rem 1.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+form button:hover,
+form input[type=\"submit\"]:hover,
+button[type=\"submit\"]:hover,
+input[type=\"submit\"]:hover {
+  background: var(--accent-hover);
+}
+
+/* Full-width, comfortably tappable submit on narrow screens. */
+@media (max-width: 480px) {
+  form:not(.button-to) button,
+  form:not(.button-to) input[type=\"submit\"] {
+    width: 100%;
+    padding: 0.8rem 1.5rem;
+  }
+}
+
+/* button_to: a single button that IS a form -- no panel, no
+   spacing; it sits inline next to links. */
 form.button-to {
   display: inline;
   max-width: none;
@@ -496,16 +736,72 @@ form.button-to {
   background: none;
   border: none;
 }
+
 form.button-to button {
+  margin-top: 0;
   background: none;
   border: 1px solid var(--border);
+  border-radius: 6px;
   color: var(--danger);
   font-weight: 500;
-  padding: 0.35rem 0.9rem;
+  font-size: 0.875rem;
+  padding: 0.4rem 0.9rem;
 }
+
+/* A danger-tinted wash, not var(--panel) -- these buttons often sit
+   ON a panel background themselves (comment cards), where a
+   panel-colored hover would have been invisible. */
 form.button-to button:hover {
-  background: var(--panel);
+  background: rgba(248, 113, 113, 0.1);
   border-color: var(--danger);
+}
+
+form button:focus-visible,
+form input[type=\"submit\"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.35);
+}
+
+/* ---------------------------------------------------------------- */
+/* Cards (comment_card / article.card).                             */
+/* ---------------------------------------------------------------- */
+
+article.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.35rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+article.card p {
+  margin: 0.4rem 0;
+}
+
+article.card p:first-child {
+  margin-top: 0;
+}
+
+article.card strong {
+  /* var(--accent) is tuned for filled surfaces (adr'd at the top of
+     this file); a commenter's name is body-copy-sized TEXT, exactly
+     the case --accent-text exists for -- plain --accent under-
+     contrasts here the same way it would in a paragraph link. */
+  color: var(--accent-text);
+  font-size: 1.02rem;
+}
+
+article.card small {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* button_to with no .actions wrapper (comment_card's own Delete) --
+   a little breathing room from the timestamp line above it. */
+article.card > form.button-to {
+  display: inline-block;
+  margin-top: 0.6rem;
 }
 ".
 
@@ -626,6 +922,28 @@ Rules you can rely on:
 :- page(new,   "/{{feature}}/new",      [as(new_{{sing}})]).   %% new_{{sing}}_path
 :- page(show,  "/{{feature}}/:id",      [as({{sing}})]).       %% {{sing}}_path(Id)
 :- page(edit,  "/{{feature}}/:id/edit", [as(edit_{{sing}})]).  %% edit_{{sing}}_path(Id)
+
+%   Everything below is PUBLIC until you say otherwise. Once you
+%   have authentication (bin/px generate px:auth), uncomment this
+%   block to keep reading public and writing signed-in-only --
+%   authorize/2 failing sends the visitor to the sign-in page.
+%   Pages authorize by ACTION (an atom); messages authorize by the
+%   decoded MESSAGE TERM (a compound) -- writes post to the paths of
+%   public pages, so the catch-all guarding both shapes is what
+%   actually protects them. Open a message to everyone by shape:
+%   authorize(some_msg(_), _Env).
+%
+%   :- use_module(app(shared/auth), [require_user/1]).
+%
+%   authorize(index, _Env).                        %% anyone
+%   authorize(show,  _Env).                        %% anyone
+%   authorize(_,     Env) :- require_user(Env).    %% new/edit + every write
+%
+%   To also HIDE the admin links from signed-out readers, put the
+%   flag in the model (m{..., signed_in: Flag} via signed_in(Env))
+%   and give the actions row two template clauses in views.pl -- one
+%   matching signed_in: true that renders them, one matching false
+%   that renders nothing.
 
 %   model(Action, Env, Model): gather everything the page needs.
 %   path_id/3 reads an integer :id from the URL and FAILS on

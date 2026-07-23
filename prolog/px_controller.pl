@@ -56,7 +56,8 @@ defined no layout/2 template.
 
 %   Sibling imports per adr/0030: the spec is the location.
 :- use_module(px_template).
-:- use_module(px_env, [respond/3, respond/4, redirect/3, not_found/2]).
+:- use_module(px_env, [respond/3, respond/4, redirect/3, redirect/4,
+                       not_found/2]).
 :- use_module(px_form, [form_result/3]).
 :- use_module(px_turbo, [turbo_or_redirect/4, turbo_stream/3]).
 :- use_module(px_assets, []).
@@ -194,10 +195,13 @@ prolog:message(px_controller(missing(M, PI))) -->
 %   the 404 (adr/0027 decision 2).
 
 serve_get(M, Action, Env0, Env) :-
-    (   M:model(Action, Env0, Model)
-    ->  M:view(Action, Model, Html),
-        respond(Env0, Html, Env)
-    ;   not_found(Env0, Env)
+    (   authorized(M, Action, Env0)
+    ->  (   M:model(Action, Env0, Model)
+        ->  M:view(Action, Model, Html),
+            respond(Env0, Html, Env)
+        ;   not_found(Env0, Env)
+        )
+    ;   deny(Env0, Env)
     ).
 
 %!  serve_msg(+M, +Action, +Env0, -Env) is det.
@@ -208,11 +212,49 @@ serve_get(M, Action, Env0, Env) :-
 
 serve_msg(M, Action, Env0, Env) :-
     (   current_predicate(M:update/4),
-        decode_msg(M, Env0, Msg),
-        M:model(Action, Env0, Model0),
-        M:update(Msg, Model0, Model, Effects)
-    ->  run_effects(Effects, M, Action, Model, Env0, Env)
+        decode_msg(M, Env0, Msg)
+    ->  (   authorized(M, Msg, Env0)
+        ->  (   M:model(Action, Env0, Model0),
+                M:update(Msg, Model0, Model, Effects)
+            ->  run_effects(Effects, M, Action, Model, Env0, Env)
+            ;   not_found(Env0, Env)
+            )
+        ;   deny(Env0, Env)
+        )
     ;   not_found(Env0, Env)
+    ).
+
+%!  authorized(+M, +ActionOrMsg, +Env) is semidet.
+%!  deny(+Env0, -Env) is det.
+%
+%   The authorize hook (adr/0035 decision 1): a controller MAY define
+%   authorize/2; when it does, failure means "not you" and deny/2
+%   answers -- through the multifile denied/2 hook when any clause
+%   exists (generated auth code redirects to its sign-in page there),
+%   else a plain 403. No authorize/2 = everything is public.
+%
+%   GET pages authorize on the ACTION (an atom); messages authorize
+%   on the decoded MESSAGE TERM (a compound) -- one predicate, clause
+%   shape selects. This matters: write messages post to the paths of
+%   pages that are often public (destroy posts to show), so guarding
+%   by action alone would wave a forged write through a public page.
+%   A catch-all `authorize(_, Env) :- require_user(Env).` therefore
+%   guards both dimensions at once; a public message is opened by
+%   shape: `authorize(create_comment(_), _).`
+
+:- multifile denied/2.
+:- dynamic denied/2.
+
+authorized(M, Action, Env) :-
+    (   current_predicate(M:authorize/2)
+    ->  M:authorize(Action, Env)
+    ;   true
+    ).
+
+deny(Env0, Env) :-
+    (   denied(Env0, Env)
+    ->  true
+    ;   respond(Env0, "403 Forbidden", [status(403)], Env)
     ).
 
 %!  decode_msg(+M, +Env, -Msg) is semidet.
@@ -261,27 +303,43 @@ to_atom(V, A) :- string(V), !, atom_string(A, V).
 run_effects(Effects, M, Action, Model, Env0, Env) :-
     must_be(list, Effects),
     forall(member(E, Effects), check_effect(E)),
+    findall(header(N, V), member(header(N, V), Effects), HeaderOpts),
     (   memberchk(redirect(PathTerm), Effects)
     ->  (   memberchk(turbo(Streams), Effects)
-        ->  turbo_or_redirect(Env0, PathTerm, Streams, Env)
-        ;   redirect(Env0, PathTerm, Env)
+        ->  turbo_or_redirect(Env0, PathTerm, Streams, Env1),
+            add_headers(Env1, HeaderOpts, Env)
+        ;   redirect(Env0, PathTerm, HeaderOpts, Env)
         )
     ;   memberchk(turbo(Streams), Effects)
-    ->  turbo_stream(Env0, Streams, Env)
+    ->  turbo_stream(Env0, Streams, Env1),
+        add_headers(Env1, HeaderOpts, Env)
     ;   M:view(Action, Model, Html),
         (   memberchk(status(S), Effects)
-        ->  respond(Env0, Html, [status(S)], Env)
-        ;   respond(Env0, Html, Env)
-        )
+        ->  StatusOpts = [status(S)]
+        ;   StatusOpts = []
+        ),
+        append(StatusOpts, HeaderOpts, Opts),
+        respond(Env0, Html, Opts, Env)
     ).
+
+%   Fold header effects into an already-built response (the turbo
+%   paths construct their own response dicts).
+add_headers(Env, [], Env) :- !.
+add_headers(Env0, HeaderOpts, Env) :-
+    findall(N-V, member(header(N, V), HeaderOpts), Extra),
+    get_dict(response, Env0, R0),
+    get_dict(headers, R0, Hs0),
+    append(Hs0, Extra, Hs),
+    Env = Env0.put(response/headers, Hs).
 
 check_effect(redirect(_)) :- !.
 check_effect(turbo(Streams)) :- !, must_be(list, Streams).
 check_effect(status(S)) :- !, must_be(integer, S).
+check_effect(header(N, V)) :- !, must_be(text, N), must_be(text, V).
 check_effect(E) :-
     throw(error(domain_error(px_controller_effect, E),
                 context(px_controller:update/4,
-                        'effects are redirect(PathTerm), turbo(Streams), status(Code)'))).
+                        'effects are redirect(PathTerm), turbo(Streams), status(Code), header(Name, Value)'))).
 
 
 		 /*******************************

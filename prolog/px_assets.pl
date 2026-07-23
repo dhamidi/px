@@ -71,8 +71,21 @@ branch is untouched.
 
 %!  repo_root(-Dir) is det.
 %
-%   The repository root, resolved once relative to this file
-%   (prolog/px_assets.pl -> ..).
+%   The APPLICATION root: assets belong to the app being served, not
+%   to the framework checkout. The boot convention is cwd = app root
+%   (bin/px server cds there), so a cwd holding assets/ or public/
+%   wins; the framework's own tree (resolved relative to this file)
+%   is only the fallback -- which also serves the framework repo's
+%   demo app, where the two coincide. Without this, every scaffolded
+%   app silently served the FRAMEWORK's stylesheets and edits to its
+%   own assets/ did nothing.
+repo_root(Dir) :-
+    working_directory(CWD, CWD),
+    (   directory_file_path(CWD, assets, A), exists_directory(A)
+    ;   directory_file_path(CWD, public, P), exists_directory(P)
+    ),
+    !,
+    Dir = CWD.
 repo_root(Dir) :-
     px_assets_source_dir(Here),
     atomic_list_concat([Here, '/..'], Rel),

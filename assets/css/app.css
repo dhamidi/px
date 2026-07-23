@@ -66,11 +66,23 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 { font-size: clamp(1.45rem, 4.5vw, 1.8rem); margin-bottom: 0.5rem; }
 h2 { font-size: clamp(1.15rem, 3.5vw, 1.35rem); margin-top: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+h3 { font-size: clamp(1rem, 3vw, 1.1rem); margin-top: 1.75rem; margin-bottom: 0.75rem; }
 
 p { color: var(--text); }
 
 a { color: var(--accent-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+/* Link + button(_to) rows -- edit/delete next to each other, etc.
+   flex-wrap so a long label never forces horizontal scroll at 390px
+   (adr/0028). */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
 
 .adr-list {
   list-style: none;
@@ -158,35 +170,45 @@ hr {
 form {
   max-width: 28rem;
   margin: 1.5rem 0 3rem;
-  padding: 1rem;
+  padding: 1.25rem;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
+  /* A hairline top highlight plus a soft drop shadow read as a very
+     slightly raised panel -- the flat-panel-on-flat-page look the
+     UI fidelity pass flagged is otherwise indistinguishable from the
+     page background at a glance. */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 @media (min-width: 640px) {
   form {
-    padding: 1.5rem;
+    padding: 1.75rem 2rem;
   }
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  margin-bottom: 1.4rem;
+  margin-bottom: 1.6rem;
 }
 
+/* The submit button owns its own top margin (below) as the form's
+   one clear "done, now act" pause -- so the last field doesn't also
+   add a second, smaller gap on top of it. */
 .field:last-of-type {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
 }
 
 .field label {
-  font-size: 0.78rem;
+  /* Sentence case, not shouty tiny-caps: humanize/2 already renders
+     "Title", "Commenter", ... -- text-transform: uppercase fought
+     that casing AND made 0.78rem read as illegibly cramped. Bumped
+     size + a real margin below fixes both at once. */
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
 }
 
 input[type="text"],
@@ -197,11 +219,12 @@ textarea,
 select {
   width: 100%;
   max-width: 28rem;
+  min-height: 2.75rem;
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.6rem 0.75rem;
+  padding: 0.6rem 0.85rem;
   font-size: 0.95rem;
   font-family: inherit;
   line-height: 1.4;
@@ -229,6 +252,14 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(62, 99, 221, 0.25);
 }
 
+/* A left accent bar groups label + input + error under one visual
+   cue, on top of the input's own red border, so an errored field
+   still reads at a glance even scanning fast down a long form. */
+.field-error {
+  border-left: 3px solid var(--danger);
+  padding-left: 0.75rem;
+}
+
 .field-error input[type="text"],
 .field-error input[type="email"],
 .field-error input[type="password"],
@@ -250,7 +281,10 @@ select:focus {
 p.error {
   color: var(--danger);
   font-size: 0.82rem;
-  margin: 0;
+  /* Tight to the input above it (attached), looser from whatever
+     follows (the next field's label) -- .field's own margin-bottom
+     already supplies that trailing space. */
+  margin: 0.45rem 0 0;
 }
 
 form button,
@@ -258,13 +292,17 @@ form input[type="submit"],
 button[type="submit"],
 input[type="submit"] {
   display: inline-block;
+  /* The one clear "you're done with the fields" pause before the
+     submit row (button_to overrides this back to 0 below -- it is
+     not a fielded form). */
+  margin-top: 2rem;
   background: var(--accent);
   /* was #0f1115 (dark) -- readable on the old pale #7dd3fc, fails on
      the new saturated #3E63DD indigo; --accent-contrast is white. */
   color: var(--accent-contrast);
   border: none;
   border-radius: 8px;
-  padding: 0.65rem 1.5rem;
+  padding: 0.7rem 1.75rem;
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
@@ -300,15 +338,21 @@ form.button-to {
 }
 
 form.button-to button {
+  margin-top: 0;
   background: none;
   border: 1px solid var(--border);
+  border-radius: 6px;
   color: var(--danger);
   font-weight: 500;
-  padding: 0.35rem 0.9rem;
+  font-size: 0.875rem;
+  padding: 0.4rem 0.9rem;
 }
 
+/* A danger-tinted wash, not var(--panel) -- these buttons often sit
+   ON a panel background themselves (comment cards), where a
+   panel-colored hover would have been invisible. */
 form.button-to button:hover {
-  background: var(--panel);
+  background: rgba(248, 113, 113, 0.1);
   border-color: var(--danger);
 }
 
@@ -325,20 +369,37 @@ form input[type="submit"]:focus-visible {
 article.card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  padding: 1.1rem 1.35rem;
   margin-bottom: 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 article.card p {
-  margin: 0.3rem 0;
+  margin: 0.4rem 0;
+}
+
+article.card p:first-child {
+  margin-top: 0;
 }
 
 article.card strong {
-  color: var(--accent);
+  /* var(--accent) is tuned for filled surfaces (adr'd at the top of
+     this file); a commenter's name is body-copy-sized TEXT, exactly
+     the case --accent-text exists for -- plain --accent under-
+     contrasts here the same way it would in a paragraph link. */
+  color: var(--accent-text);
+  font-size: 1.02rem;
 }
 
 article.card small {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+/* button_to with no .actions wrapper (comment_card's own Delete) --
+   a little breathing room from the timestamp line above it. */
+article.card > form.button-to {
+  display: inline-block;
+  margin-top: 0.6rem;
 }
