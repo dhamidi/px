@@ -76,12 +76,18 @@ test/             milestone proofs for each layer, run for real, not just writte
 
 ## Getting started from a fresh clone
 
-Two packages, then px bootstraps itself (adr/0034) — the C bindings
+prologex targets **SWI-Prolog 10** (adr/0039). Homebrew already ships
+10.x; on Ubuntu the distro package is 9.x, so add the official
+upstream PPA. Then px bootstraps itself (adr/0034) — the C bindings
 build automatically on the first command that needs them:
 
 ```sh
-# macOS:  brew install swi-prolog libuv
-# Debian: apt install swi-prolog-nox libuv1-dev build-essential
+# macOS:
+brew install swi-prolog libuv
+
+# Ubuntu/Debian (the distro's swi-prolog is 9.x; the PPA is 10.x):
+sudo add-apt-repository ppa:swi-prolog/stable
+sudo apt update && sudo apt install swi-prolog-nox libuv1-dev build-essential
 
 git clone https://github.com/dhamidi/px
 px/bin/px install                 # px on your PATH (~/.local/bin, no sudo)
