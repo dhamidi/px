@@ -48,10 +48,25 @@ home into the generated bin/ shims, visible and editable.
 
 cli :-
     current_prolog_flag(argv, Argv),
-    (   catch(main(Argv), E,
-              ( print_message(error, E), halt(1) ))
+    (   catch(main(Argv), E, cli_recover(E))
     ->  true
     ;   halt(1)
+    ).
+
+%   SWI-Prolog 10 implements halt/1 as a catchable stack unwind
+%   (throw(unwind(halt(Code)))) so cleanups run on the way out, where
+%   9.x exited immediately. Our commands halt(0)/halt(1) from inside
+%   main/1, i.e. inside this catch -- so the recovery MUST re-throw a
+%   halt (any unwind/1) rather than swallow it and force halt(1),
+%   which turned every successful `px` command into exit 1 on 10.x
+%   (the whole CLI looked broken). Re-throwing lets the halt reach the
+%   top level and set the real exit code; on 9.x halt is not an
+%   exception, so this clause is simply never reached there.
+cli_recover(E) :-
+    (   E = unwind(_)
+    ->  throw(E)
+    ;   print_message(error, E),
+        halt(1)
     ).
 
 main([new, App|_])                    :- !, cmd_new(App), halt(0).
