@@ -15,11 +15,9 @@
 
 config(port, env('PORT', 8090)).
 config(workers, 2).
-config(database, "data/prologex.db").
 
-%% Environment overlay: applies only when PROLOGEX_ENV=production.
-%% Env-driven (adr/0022) so a real system install points at
-%% /var/lib via DATABASE_PATH, while this --user sandbox deploy just
-%% keeps the writable local data dir -- no hardcoded system path that
-%% the running user may not be able to create.
-config(production, database, env('DATABASE_PATH', "data/prologex.db")).
+%% Env-driven (adr/0022): DATABASE_PATH overrides in any environment
+%% (a real deploy points it at /var/lib; the dev instance on 8092 sets
+%% its own path so its guestbook writes don't touch production's),
+%% defaulting to the writable local data dir.
+config(database, env('DATABASE_PATH', "data/prologex.db")).

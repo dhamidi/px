@@ -1,0 +1,30 @@
+# prologex-dev.service -- the demo app in DEVELOPMENT mode, for trying
+# the hot reload + developer console (adr/0036, adr/0038) on the VM.
+#
+# No PROLOGEX_ENV -> development: hot reload on, assets served unhashed
+# from source, and the console mounted at /__px/console with a per-boot
+# token. Runs on 8092, beside the production demo (8090) and blog
+# (8091). Its own database so guestbook writes don't touch production's.
+#
+# Reachable only by authorized VM users through the exe.dev proxy
+# (ports 3000-9999 are auth-gated). The console is arbitrary Prolog
+# evaluation -- do NOT `ssh exe.dev share set-public` while this runs.
+#
+#   cp deploy/prologex-dev.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now prologex-dev
+[Unit]
+Description=prologex demo (development mode: hot reload + console)
+After=network.target
+
+[Service]
+Type=simple
+Environment=PORT=8092
+Environment=DATABASE_PATH=data/prologex-dev.db
+ExecStart=/home/exedev/prologex/deploy/run.sh
+Restart=on-failure
+RestartSec=2
+LimitNOFILE=65536
+TimeoutStopSec=15
+
+[Install]
+WantedBy=default.target
