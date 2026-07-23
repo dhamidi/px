@@ -355,16 +355,66 @@ fields_schema(Fields, Text) :-
 sql_type(number, integer) :- !.
 sql_type(_, text).
 
-fields_show_lines(Sing, Fields, Text) :-
+%   field_var(title, 'Title'): the plain Prolog variable name a
+%   generated clause binds a field's value to -- field/3 always reads
+%   INTO one of these, never into a dict slot.
+field_var(F, Var) :-
+    sub_atom(F, 0, 1, After, First),
+    sub_atom(F, 1, After, 0, Rest),
+    upcase_atom(First, FirstUp),
+    atom_concat(FirstUp, Rest, Var).
+
+%   "Title, Body" -- the field vars alone, in field order.
+fields_vars(Fields, Text) :-
+    findall(Var,
+            ( member(F-_, Fields), field_var(F, Var) ),
+            Vars),
+    atomic_list_concat(Vars, ', ', Text).
+
+%   "Id, Title, Body" -- what a record term's arguments look like:
+%   the :id first, then one variable per field, in field order.
+fields_record_pattern(Fields, Text) :-
+    fields_vars(Fields, Vars),
+    (   Vars == ''
+    ->  Text = 'Id'
+    ;   format(atom(Text), 'Id, ~w', [Vars])
+    ).
+
+%   "_, _" -- one wildcard per field, same count as fields_vars/2, for
+%   patterns that only care about the record's :id.
+fields_wild(Fields, Text) :-
+    findall('_', member(_, Fields), Wilds),
+    atomic_list_concat(Wilds, ', ', Text).
+
+%   The field/3 extraction a model/3 clause runs against an already-
+%   fetched Row, one field per line: "field(Row, title, Title),".
+fields_extract(Fields, Text) :-
     findall(Line,
             ( member(F-_, Fields),
-              format(atom(Line), "        p([strong(\"~w: \"), text(M.~w.~w)]),",
-                     [F, Sing, F])
+              field_var(F, Var),
+              format(atom(Line), "    field(Row, ~w, ~w),", [F, Var])
+            ),
+            Lines),
+    atomic_list_concat(Lines, '\n', Text).
+
+%   The show page's field-by-field display, one line per field, all
+%   plain variables -- model/3 already extracted them with field/3, so
+%   there is nothing left for the template to reach into.
+fields_show_lines(Fields, Text) :-
+    findall(Line,
+            ( member(F-_, Fields),
+              field_var(F, Var),
+              format(atom(Line), "        p([strong(\"~w: \"), text(~w)]),",
+                     [F, Var])
             ),
             Lines),
     atomic_list_concat(Lines, '\n', Text).
 
 first_field([F-_|_], F).
+
+first_field_var(Fields, Var) :-
+    first_field(Fields, F),
+    field_var(F, Var).
 
 
 		 /*******************************
@@ -872,12 +922,22 @@ feature_pairs(Name, Sing, Fields,
                 '{{form_fields}}'-FormDecl,
                 '{{schema}}'-Schema,
                 '{{show_lines}}'-ShowLines,
-                '{{first_field}}'-First
+                '{{first_field}}'-First,
+                '{{first_field_var}}'-FirstVar,
+                '{{record_vars}}'-RecordVars,
+                '{{record_pattern}}'-RecordPattern,
+                '{{record_wild}}'-RecordWild,
+                '{{field_extract}}'-FieldExtract
               ]) :-
     fields_form_decl(Fields, FormDecl),
     fields_schema(Fields, Schema),
-    fields_show_lines(Sing, Fields, ShowLines),
-    first_field(Fields, First).
+    fields_show_lines(Fields, ShowLines),
+    first_field(Fields, First),
+    first_field_var(Fields, FirstVar),
+    fields_vars(Fields, RecordVars),
+    fields_record_pattern(Fields, RecordPattern),
+    fields_wild(Fields, RecordWild),
+    fields_extract(Fields, FieldExtract).
 
 tpl_feature_controller(Name, Sing, Fields, C) :-
     feature_pairs(Name, Sing, Fields, Pairs),
@@ -903,9 +963,15 @@ Rules you can rely on:
     submission re-renders that page with the errors filled in. That
     is why the create form posts to /{{feature}}/new and the update
     form to /{{feature}}/:id/edit -- look at views.pl.
+  - A database row is a Key-Value pairs list, never a dict: field/3
+    reads one column (and throws on a typo\'d one, loudly, rather
+    than failing silently). model/3 below reads every column a page
+    needs into a plain, named variable BEFORE the view ever runs --
+    the view works with those variables, never with a row.
 */
 
 :- use_module(library(prologex)).
+:- use_module(library(apply), [maplist/3]).        % summarize_{{sing}}/2 over the row list
 :- use_module(app({{feature}}/messages), []).      % the form declarations
 :- use_module(app({{feature}}/model), [empty/1]).  % the pure core; its update/3
                                           % is called qualified below, because
@@ -940,11 +1006,27 @@ Rules you can rely on:
 %   authorize(show,  _Env).                        %% anyone
 %   authorize(_,     Env) :- require_user(Env).    %% new/edit + every write
 %
-%   To also HIDE the admin links from signed-out readers, put the
-%   flag in the model (m{..., signed_in: Flag} via signed_in(Env))
-%   and give the actions row two template clauses in views.pl -- one
-%   matching signed_in: true that renders them, one matching false
-%   that renders nothing.
+%   To also HIDE the admin links from signed-out readers, add a flag
+%   argument to the page(...) model term below, set it from
+%   signed_in(Env) in model/3, and give the actions row two template
+%   clauses in views.pl -- one matching a true flag that renders
+%   them, one matching false that renders nothing.
+
+%   The model is one small tagged term shared by every action in this
+%   file, page(Rows, Record, Values, Errors):
+%
+%     Rows     a list of {{sing}}_summary(Id, First, Created) terms,
+%              used by the index page.
+%     Record   a {{sing}}(Id, ...) term, one argument per field, or
+%              the atom `none`; used by the show and edit pages.
+%     Values   the current form values as a Key-Value pairs list; []
+%              until a form is involved.
+%     Errors   the current form\'s error(Field, Message) list, or [].
+%
+%   Every action leaves the fields it does not need at their empty/1
+%   defaults -- the view for that action only ever looks at the parts
+%   it uses (see below), the same way a template only matches the
+%   shape it expects.
 
 %   model(Action, Env, Model): gather everything the page needs.
 %   path_id/3 reads an integer :id from the URL and FAILS on
@@ -953,53 +1035,70 @@ Rules you can rely on:
 
 model(index, _Env, M) :-
     all_{{feature}}(Rows),
+    maplist(summarize_{{sing}}, Rows, Summaries),
     empty(M0),
-    {{feature}}_model:update(loaded(Rows), M0, M).
+    {{feature}}_model:update(loaded(Summaries), M0, M).
 model(new, _Env, M) :-
     empty(M).
 model(show, Env, M) :-
     path_id(Env, id, Id),
     find_{{sing}}(Id, Row),
+{{field_extract}}
     empty(M0),
-    {{feature}}_model:update(found(Row), M0, M).
+    {{feature}}_model:update(found({{sing}}({{record_pattern}})), M0, M).
 model(edit, Env, M) :-
     path_id(Env, id, Id),
     find_{{sing}}(Id, Row),
+{{field_extract}}
     empty(M0),
-    {{feature}}_model:update(editing(Row), M0, M).
+    {{feature}}_model:update(editing({{sing}}({{record_pattern}}), Row), M0, M).
+
+%   A row -> its index-card summary: the :id, the one field the card
+%   shows, and when it was created -- the only parts {{sing}}_card
+%   (views.pl) needs, read out with field/3 once, here, so the view
+%   never has to.
+summarize_{{sing}}(Row, {{sing}}_summary(Id, First, Created)) :-
+    field(Row, id, Id),
+    field(Row, {{first_field}}, First),
+    field(Row, created_at, Created).
 
 %   view(Action, Model, Html): pure -- model in, template term out.
-%   The templates live in views.pl.
+%   Each clause destructures Model down to the plain variables its
+%   own page needs; the templates in views.pl never see a row or the
+%   page(...) term itself.
 
-view(index, M, {{sing}}_index(M)).
-view(new,   M, {{sing}}_new(M)).
-view(show,  M, {{sing}}_show(M)).
-view(edit,  M, {{sing}}_edit(M)).
+view(index, page(Rows, _, _, _), {{sing}}_index(Rows)).
+view(new,   page(_, _, Values, Errors), {{sing}}_new(Values, Errors)).
+view(show,  page(_, {{sing}}({{record_pattern}}), _, _), {{sing}}_show({{record_pattern}})).
+view(edit,  page(_, {{sing}}(Id, {{record_wild}}), Values, Errors), {{sing}}_edit(Id, Values, Errors)).
 
 %   update(Msg, Model0, Model, Effects): run the side effect through
 %   commands.pl, fold the outcome into the model, answer with
 %   effects. Model0 comes from whichever page\'s model/3 the form
-%   posted to -- on show/edit pages, M0.{{sing}} is already the
-%   loaded row, which is where the :id for update/destroy comes from.
+%   posted to -- on show/edit pages, Model0\'s Record already carries
+%   the :id that update/destroy need, no re-parsing required.
 
-update(create_{{sing}}(ok(Values)), _M0, M, Effects) :-
+update(create_{{sing}}(ok(Values)), _M0, M, [redirect({{sing}}_path(Id))]) :-
     save_{{sing}}(Values, Row),
-    Effects = [redirect({{sing}}_path(Row.id))],
+{{field_extract}}
+    field(Row, id, Id),
     empty(M1),
-    {{feature}}_model:update(found(Row), M1, M).
+    {{feature}}_model:update(found({{sing}}({{record_pattern}})), M1, M).
 update(create_{{sing}}(invalid(Values, Errors)), M0, M, [status(422)]) :-
     {{feature}}_model:update(rejected(Values, Errors), M0, M).
 
 update(update_{{sing}}(ok(Values)), M0, M, [redirect({{sing}}_path(Id))]) :-
-    Id = M0.{{sing}}.id,
+    M0 = page(_, {{sing}}(Id, {{record_wild}}), _, _),
     revise_{{sing}}(Id, Values, Row),
+{{field_extract}}
     empty(M1),
-    {{feature}}_model:update(found(Row), M1, M).
+    {{feature}}_model:update(found({{sing}}({{record_pattern}})), M1, M).
 update(update_{{sing}}(invalid(Values, Errors)), M0, M, [status(422)]) :-
     {{feature}}_model:update(rejected(Values, Errors), M0, M).
 
 update(destroy_{{sing}}(ok(_)), M0, M0, [redirect({{feature}}_path)]) :-
-    remove_{{sing}}(M0.{{sing}}.id).
+    M0 = page(_, {{sing}}(Id, {{record_wild}}), _, _),
+    remove_{{sing}}(Id).
 ',
     render_tpl(T, Pairs, C).
 
@@ -1055,20 +1154,32 @@ each update/3 clause is one fact about the domain. Import nothing
 from the framework here; this module must load and test with plain
 SWI-Prolog.
 
+The model is one small tagged term, page(Rows, Record, Values,
+Errors):
+
+  - Rows    a list of {{sing}}_summary(Id, First, Created) terms, used
+            by the index page.
+  - Record  a {{sing}}(Id, ...) term with one argument per field, or
+            the atom `none`; used by the show and edit pages.
+  - Values  the current form values as a Key-Value pairs list (read
+            with field_value/3), or [] when no form is in play.
+  - Errors  the current form\'s error(Field, Message) list, or [].
+
+Every field of the tuple is present on every action, even the ones a
+given page ignores -- the controller\'s view/3 clauses pick out only
+the parts each page needs by matching the shape they expect (see
+controller.pl), the same way the templates in views.pl do.
+
 Note the style: no if-then-else, one clause per message. Templates
 work the same way (see views.pl).
 */
 
-empty(m{ {{feature}}: [], {{sing}}: none, values: _{}, errors: [] }).
+empty(page([], none, [], [])).
 
-update(loaded(Rows), M0, M) :-
-    M = M0.put({{feature}}, Rows).
-update(found(Row), M0, M) :-
-    M = M0.put({{sing}}, Row).
-update(editing(Row), M0, M) :-
-    M = M0.put(m{ {{sing}}: Row, values: Row, errors: [] }).
-update(rejected(Values, Errors), M0, M) :-
-    M = M0.put(m{ values: Values, errors: Errors }).
+update(loaded(Rows), page(_, R, V, E), page(Rows, R, V, E)).
+update(found(Record), page(Rs, _, V, E), page(Rs, Record, V, E)).
+update(editing(Record, Values), page(Rs, _, _, _), page(Rs, Record, Values, [])).
+update(rejected(Values, Errors), page(Rs, R, _, _), page(Rs, R, Values, Errors)).
 ',
     render_tpl(T, Pairs, C).
 
@@ -1088,8 +1199,10 @@ database; the table\'s schema rides with it and is applied
 automatically when the database opens.
 
 A query is a term: q(Table, Clauses) with where/order_by/limit
-clauses; row/2 yields one row per solution, as a dict keyed by
-column. insert/3, update/3 and delete/2 are the write side.
+clauses; row/2 yields one row per solution, as a Key-Value pairs
+list -- field/3 reads one column, and throws (loudly, not silently)
+on a typo\'d one. insert/3, update/3 and delete/2 are the write
+side, taking a Key-Value pairs list of the columns to write.
 */
 
 :- use_module(library(prologex)).
@@ -1130,6 +1243,14 @@ div(...)); strings escape automatically; attribute values that look
 like path helpers ({{sing}}_path(Id)) resolve to real URLs anywhere
 they appear.
 
+Every template here takes PLAIN VARIABLES, never a row and never the
+page(...) model term itself: controller.pl\'s model/3 and view/3
+already picked each field out by name (field/3, or a plain pattern
+match on an already-built record term) before a template ever runs,
+so there is nothing left here to reach into -- exactly the point of
+{{sing}}_card below, which destructures its one argument in its own
+clause head rather than calling an accessor in its body.
+
 Template names and path helpers are global across the app: any
 feature\'s views may use another\'s, with no imports. Prefix generic
 template names with the feature name so they never collide.
@@ -1144,11 +1265,11 @@ reason.
 
 :- use_module(library(prologex)).
 
-{{sing}}_index(M) ~>
+{{sing}}_index(Rows) ~>
     layout("{{feature}}",
       [ h1("{{feature}}"),
         p(class(actions), link_to("New {{sing}}", new_{{sing}}_path)),
-        {{sing}}_list(M.{{feature}})
+        {{sing}}_list(Rows)
       ]).
 
 {{sing}}_list([]) ~>
@@ -1156,41 +1277,45 @@ reason.
 {{sing}}_list(Rows) ~>
     each(Rows, {{sing}}_card).
 
-{{sing}}_card(R) ~>
+%   {{sing}}_summary(...) is the exact term controller.pl\'s
+%   summarize_{{sing}}/2 builds for each row -- matching it here, in
+%   the clause head, IS how this template destructures a row, with no
+%   accessor call anywhere in its body.
+{{sing}}_card({{sing}}_summary(Id, First, Created)) ~>
     article(class(card),
-      [ h2(link_to(R.{{first_field}}, {{sing}}_path(R.id))),
-        p(small(["created ", R.created_at]))
+      [ h2(link_to(First, {{sing}}_path(Id))),
+        p(small(["created ", Created]))
       ]).
 
-{{sing}}_show(M) ~>
-    layout(M.{{sing}}.{{first_field}},
+{{sing}}_show(Id, {{record_vars}}) ~>
+    layout({{first_field_var}},
       [ p(link_to("← all {{feature}}", {{feature}}_path)),
-        h1(M.{{sing}}.{{first_field}}),
+        h1({{first_field_var}}),
 {{show_lines}}
         div(class(actions),
-          [ link_to("Edit", edit_{{sing}}_path(M.{{sing}}.id)),
+          [ link_to("Edit", edit_{{sing}}_path(Id)),
             button_to("Delete {{sing}}", destroy_{{sing}},
-                      delete({{sing}}_path(M.{{sing}}.id)))
+                      delete({{sing}}_path(Id)))
           ])
       ]).
 
 %   The create form posts to THIS page\'s own path (new_{{sing}}_path),
 %   so an invalid submission re-renders this page: 422, errors
 %   inline, values refilled -- all automatic.
-{{sing}}_new(M) ~>
+{{sing}}_new(Values, Errors) ~>
     layout("New {{sing}}",
       [ p(link_to("← all {{feature}}", {{feature}}_path)),
         h1("New {{sing}}"),
-        form_for(create_{{sing}}, new_{{sing}}_path, M.values, M.errors)
+        form_for(create_{{sing}}, new_{{sing}}_path, Values, Errors)
       ]).
 
 %   Same principle: the update form posts back to the edit page.
 %   patch(...) makes the form submit as a PATCH.
-{{sing}}_edit(M) ~>
+{{sing}}_edit(Id, Values, Errors) ~>
     layout("Edit",
-      [ p(link_to("← back", {{sing}}_path(M.{{sing}}.id))),
+      [ p(link_to("← back", {{sing}}_path(Id))),
         h1("Edit"),
-        form_for(update_{{sing}}, patch(edit_{{sing}}_path(M.{{sing}}.id)), M.values, M.errors)
+        form_for(update_{{sing}}, patch(edit_{{sing}}_path(Id)), Values, Errors)
       ]).
 ',
     render_tpl(T, Pairs, C).

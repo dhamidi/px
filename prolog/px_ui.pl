@@ -8,7 +8,7 @@ kitchen-sink demo registry. A component module declares
 /ui/<Name> automatically; /ui lists them all in Order.
 */
 
-:- use_module(px_env, [respond/3, not_found/2]).
+:- use_module(px_env, [respond/3, not_found/2, param/3]).
 :- use_module(px_template).
 
 :- multifile demo/3.
@@ -36,7 +36,7 @@ ui_index(Env0, Env) :-
     respond(Env0, ui_index_view(Names), Env).
 
 ui_show(Env0, Env) :-
-    Name = Env0.params.name,
+    param(Env0, name, Name),
     atom_string(NameA, Name),
     (   demo(NameA, _, Call)
     ->  respond(Env0, ui_show_view(NameA, Call), Env)

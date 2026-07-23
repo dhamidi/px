@@ -1,8 +1,8 @@
 /* Milestone 15: Hotwire Turbo support (px_turbo.pl, adr/0024),
-   standalone -- no HTTP, no sockets. Fake env dicts (the adr/0017
-   shape px_env:make_env/4 builds) go through px_turbo's middleware
-   and responders; template output is captured with
-   px_template:render_to_string/2.
+   standalone -- no HTTP, no sockets. Fake envs (plain Key-Value
+   pairs lists, the adr/0017/0037 shape px_env:make_env/4 builds) go
+   through px_turbo's middleware and responders; template output is
+   captured with px_template:render_to_string/2.
 
    Covers:
      - dom_id/2: atom, compound, nested compound, number/string args
@@ -73,19 +73,31 @@ run_tests([T|Ts], Failed0, Failed) :-
     ),
     run_tests(Ts, Failed1, Failed).
 
-%   A fake env in the adr/0017 shape, with the request headers given
-%   (lowercase Name-Value string pairs) and an empty 200 response.
+%   A fake env in the adr/0017/0037 shape (a plain Key-Value pairs
+%   list), with the request headers given (lowercase Name-Value string
+%   pairs) and an empty 200 response.
 fake_env(Headers, Env) :-
-    Env = env{ method:   get,
-               path:     "/x",
-               raw_path: "/x",
-               headers:  Headers,
-               params:   _{},
-               body:     "",
-               worker:   0,
-               config:   px_config,
-               response: _{status: 200, headers: [], body: none}
-             }.
+    Env = [ method-get,
+            path-"/x",
+            raw_path-"/x",
+            headers-Headers,
+            params-[],
+            body-"",
+            worker-0,
+            config-px_config,
+            response-response(200, [], none)
+          ].
+
+%   Small response-compound helpers (adr/0037: response(Status,
+%   Headers, Body)), so the tests below read declaratively instead of
+%   repeating the compound's shape everywhere.
+set_response_body(Env0, Body, Env) :-
+    px_env:env_get(Env0, response, response(S, H, _)),
+    px_env:put_env(Env0, response, response(S, H, Body), Env).
+
+response_status(Env, Status)   :- px_env:env_get(Env, response, response(Status, _, _)).
+response_headers(Env, Headers) :- px_env:env_get(Env, response, response(_, Headers, _)).
+response_body(Env, Body)       :- px_env:env_get(Env, response, response(_, _, Body)).
 
 		 /*******************************
 		 *       TEST TEMPLATES         *
@@ -153,33 +165,36 @@ test(frame_lazy_src) :-
 
 test(prune_extracts_matching_frame) :-
     fake_env(["turbo-frame"-"post_7"], Env0),
-    Env1 = Env0.put(response/body, page_t(7)),
+    set_response_body(Env0, page_t(7), Env1),
     turbo_frames(Env1, Env),
     % body is now just the bare frame subtree, found through two ~> hops
-    Env.response.body == turbo_frame(post(7), [p("post body")]),
-    memberchk("vary"-"Turbo-Frame", Env.response.headers),
+    response_body(Env, turbo_frame(post(7), [p("post body")])),
+    response_headers(Env, Headers),
+    memberchk("vary"-"Turbo-Frame", Headers),
     % and it still renders as the standalone frame
-    px_template:render_to_string(Env.response.body, S),
+    response_body(Env, Body),
+    px_template:render_to_string(Body, S),
     S == "<turbo-frame id=\"post_7\"><p>post body</p></turbo-frame>".
 
 test(prune_extracts_legacy_escaped_frame) :-
     fake_env(["turbo-frame"-"post_7"], Env0),
-    Env1 = Env0.put(response/body, \legacy_page_t(7)),
+    set_response_body(Env0, \legacy_page_t(7), Env1),
     turbo_frames(Env1, Env),
     % walker matched the \turbo_frame escape; pruned body is bare
-    Env.response.body == turbo_frame(post(7), [p("post body")]),
-    px_template:render_to_string(Env.response.body, S),
+    response_body(Env, turbo_frame(post(7), [p("post body")])),
+    response_body(Env, Body),
+    px_template:render_to_string(Body, S),
     S == "<turbo-frame id=\"post_7\"><p>post body</p></turbo-frame>".
 
 test(prune_declines_without_header) :-
     fake_env([], Env0),
-    Env1 = Env0.put(response/body, page_t(7)),
+    set_response_body(Env0, page_t(7), Env1),
     \+ turbo_frames(Env1, _),        % declines: pipeline passes env on
-    Env1.response.body == page_t(7).
+    response_body(Env1, page_t(7)).
 
 test(prune_declines_unknown_frame) :-
     fake_env(["turbo-frame"-"post_99"], Env0),
-    Env1 = Env0.put(response/body, page_t(7)),
+    set_response_body(Env0, page_t(7), Env1),
     \+ turbo_frames(Env1, _).
 
 		 /*******************************
@@ -193,16 +208,18 @@ test(stream_response_markup) :-
                    replace(comment(post(7), 3), p("edited"))
                  ],
                  Env),
-    Env.response.status == 200,
-    memberchk("content-type"-"text/vnd.turbo-stream.html",
-              Env.response.headers),
-    px_template:render_to_string(Env.response.body, S),
+    response_status(Env, 200),
+    response_headers(Env, Headers),
+    memberchk("content-type"-"text/vnd.turbo-stream.html", Headers),
+    response_body(Env, Body),
+    px_template:render_to_string(Body, S),
     S == "<turbo-stream action=\"prepend\" target=\"posts\"><template><article class=\"card\"><h2>New</h2></article></template></turbo-stream><turbo-stream action=\"replace\" target=\"comment_post_7_3\"><template><p>edited</p></template></turbo-stream>".
 
 test(stream_remove_has_no_template) :-
     fake_env([], Env0),
     turbo_stream(Env0, [remove(post(7))], Env),
-    px_template:render_to_string(Env.response.body, S),
+    response_body(Env, Body),
+    px_template:render_to_string(Body, S),
     S == "<turbo-stream action=\"remove\" target=\"post_7\"></turbo-stream>".
 
 test(stream_rejects_unknown_action) :-
@@ -221,14 +238,15 @@ test(negotiate_stream_on_accept) :-
     fake_env(["accept"-"text/vnd.turbo-stream.html, text/html, application/xhtml+xml"],
              Env0),
     turbo_or_redirect(Env0, "/posts/7", [remove(post(7))], Env),
-    Env.response.status == 200,
-    memberchk("content-type"-"text/vnd.turbo-stream.html",
-              Env.response.headers),
-    Env.response.body == turbo_stream([remove(post(7))]).
+    response_status(Env, 200),
+    response_headers(Env, Headers),
+    memberchk("content-type"-"text/vnd.turbo-stream.html", Headers),
+    response_body(Env, turbo_stream([remove(post(7))])).
 
 test(negotiate_redirect_without_accept) :-
     fake_env(["accept"-"text/html,application/xhtml+xml"], Env0),
     turbo_or_redirect(Env0, "/posts/7", [remove(post(7))], Env),
-    Env.response.status == 303,
-    memberchk("location"-"/posts/7", Env.response.headers),
-    Env.response.body == none.
+    response_status(Env, 303),
+    response_headers(Env, Headers),
+    memberchk("location"-"/posts/7", Headers),
+    response_body(Env, none).

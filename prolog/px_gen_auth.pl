@@ -79,8 +79,10 @@ print_next_steps :-
     format("                     route_dispatch,~n", []),
     format("                     turbo_frames~n", []),
     format("                   ]).~n~n", []),
-    format("   Every page's Env now carries Env.user -- a users row when the~n", []),
-    format("   request's px_session cookie names a live session, or `none`.~n~n", []),
+    format("   Every page's Env now carries a signed-in user, read with~n", []),
+    format("   current_user(Env, User) -- a users row when the request's~n", []),
+    format("   px_session cookie names a live session; signed_in(Env) alone~n", []),
+    format("   answers yes/no.~n~n", []),
     format("2. Create a user. The database opens lazily on first use, and~n", []),
     format("   create_user/2 opens it itself, so this works straight from the~n", []),
     format("   console with no extra step:~n~n", []),
@@ -182,13 +184,14 @@ a signed token stays valid until it expires no matter what you do.
 create_user(Email, Password) :-
     prologex:ensure_db,
     crypto_password_hash(Password, Hash),
-    insert(users, _{email: Email, password_hash: Hash}, _Id).
+    insert(users, [email-Email, password_hash-Hash], _Id).
 
 %!  verify_user(+Email, +Password, -User) is semidet.
 %
-%   User is the users row for Email when Password is correct; fails
-%   for BOTH "no such email" and "wrong password", so a caller can
-%   show one generic error and never leak which one it was.
+%   User is the users row (a Key-Value pairs list, like every row
+%   this framework hands back) for Email when Password is correct;
+%   fails for BOTH "no such email" and "wrong password", so a caller
+%   can show one generic error and never leak which one it was.
 %
 %   crypto_password_hash/2 insists its Hash argument be an ATOM in
 %   check mode -- a text column comes back from the database as a
@@ -196,7 +199,8 @@ create_user(Email, Password) :-
 %   converts it right here, the one place that needs to know.
 verify_user(Email, Password, User) :-
     (   once(row(q(users, [where(email == Email)]), Row))
-    ->  atom_string(Hash, Row.password_hash),
+    ->  field(Row, password_hash, HashS),
+        atom_string(Hash, HashS),
         Found = true
     ;   dummy_hash(Hash),
         Found = false
@@ -212,7 +216,7 @@ verify_user(Email, Password, User) :-
 create_session(UserId, Token) :-
     crypto_n_random_bytes(16, Bytes),
     hex_bytes(Token, Bytes),
-    insert(sessions, _{user_id: UserId, token: Token}, _Id).
+    insert(sessions, [user_id-UserId, token-Token], _Id).
 
 %!  drop_session(+Token) is det.
 %
@@ -228,7 +232,8 @@ drop_session(Token) :-
 %   cookie at all.
 session_user(Token, User) :-
     once(row(q(sessions, [where(token == Token)]), Session)),
-    once(row(q(users, [where(id == Session.user_id)]), User)).
+    field(Session, user_id, UserId),
+    once(row(q(users, [where(id == UserId)]), User)).
 '.
 
 tpl_auth_model(C) :-
@@ -242,16 +247,22 @@ HTTP or storage. No prologex import, no database, no env, ever -- this
 module must load and test with nothing but plain SWI-Prolog, the same
 rule every feature\'s model.pl follows.
 
-Only one domain message exists: a rejected sign-in attempt, whether
-the form itself was incomplete or the credentials were wrong. Both
-land here with the same shape as the CRUD scaffold\'s own
-rejected(Values, Errors) -- refill the values, show the errors.
+The model is one small tagged term, session(Token, Values, Errors):
+Token is the px_session cookie value (or `none`) that a sign-out
+needs to know which row to delete; Values/Errors are the sign-in
+form\'s current values (a Key-Value pairs list) and errors, same
+shape as the CRUD scaffold\'s own rejected(Values, Errors).
+
+Two domain messages fold over it: token(Token) records which session
+cookie this request carried, and rejected(Values, Errors) lands a
+sign-in attempt that failed, whether the form itself was incomplete
+or the credentials were wrong -- refill the values, show the errors.
 */
 
-empty(m{values: _{}, errors: []}).
+empty(session(none, [], [])).
 
-update(rejected(Values, Errors), M0, M) :-
-    M = M0.put(_{values: Values, errors: Errors}).
+update(token(Token), session(_, V, E), session(Token, V, E)).
+update(rejected(Values, Errors), session(Token, _, _), session(Token, Values, Errors)).
 '.
 
 tpl_auth_messages(C) :-
@@ -290,22 +301,23 @@ this file, like every views.pl, never touches the request.
 
 :- use_module(library(prologex)).
 
-sign_in_new(M) ~>
+sign_in_new(Values, Errors) ~>
     layout("Sign in",
       [ h1("Sign in"),
-        form_for(sign_in, sign_in_path, M.values, M.errors)
+        form_for(sign_in, sign_in_path, Values, Errors)
       ]).
 
 %   Embed this wherever a signed-in user should see who they are and
 %   a way to sign out -- inside your layout, or a page\'s own view:
-%       sign_out_button(M.user)
-%   Only call it when M.user is a real user, not the atom `none` --
-%   guard with signed_in(Env) (app/shared/auth.pl) in the page\'s own
-%   model/3 and put the result in the Model, the same way every pure
-%   view stays pure: it never checks the env itself.
-sign_out_button(User) ~>
+%       sign_out_button(Email)
+%   Email is a plain string, not a users row -- pull it out with
+%   field(User, email, Email) in the page\'s own model/3 (User comes
+%   from current_user(Env, User), app/shared/auth.pl) and put Email,
+%   not User, in the Model, the same way every pure view stays pure:
+%   it never checks the env itself, and never reaches into a row.
+sign_out_button(Email) ~>
     p(class(actions),
-      [ "Signed in as ", User.email, " ",
+      [ "Signed in as ", Email, " ",
         button_to("Sign out", sign_out, sign_in_path)
       ]).
 '.
@@ -350,17 +362,20 @@ Two things about THIS controller are worth reading closely:
 :- page(new, "/session/new", [as(sign_in)]).   %% sign_in_path
 
 model(new, Env, M) :-
-    ( px_env:cookie(Env, px_session, Token) -> true ; Token = none ),
+    ( cookie(Env, px_session, Token) -> true ; Token = none ),
     empty(M0),
-    M = M0.put(token, Token).
+    auth_model:update(token(Token), M0, M).
 
-view(new, M, sign_in_new(M)).
+view(new, session(_, Values, Errors), sign_in_new(Values, Errors)).
 
 %   Correct credentials: start a session, set the cookie, go home.
 update(sign_in(ok(V)), M0, M, Effects) :-
-    verify_user(V.email, V.password, User),
+    field_value(V, email, Email),
+    field_value(V, password, Password),
+    verify_user(Email, Password, User),
     !,
-    create_session(User.id, Token),
+    field(User, id, UserId),
+    create_session(UserId, Token),
     format(string(Cookie), "px_session=~w; Path=/; HttpOnly; SameSite=Lax", [Token]),
     Effects = [redirect("/"), header("set-cookie", Cookie)],
     M = M0.
@@ -383,7 +398,8 @@ update(sign_out(ok(_)), M0, M0,
          header("set-cookie",
                 "px_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0")
        ]) :-
-    drop_session(M0.token).
+    M0 = session(Token, _, _),
+    drop_session(Token).
 '.
 
 tpl_shared_auth(C) :-
@@ -402,7 +418,8 @@ point of this file: authenticate/2 below NEVER fails, so it is safe to
 run on every single request, including ones from nobody in particular.
 
 Add it to the pipeline (app/shared/middleware.pl) and every page\'s Env
-carries Env.user from then on: a real users row when the request\'s
+carries a `user` key from then on, read with current_user/2: a real
+users row (a Key-Value pairs list, like every row) when the request\'s
 px_session cookie names a live session, or the atom `none` otherwise.
 */
 
@@ -414,22 +431,23 @@ px_session cookie names a live session, or the atom `none` otherwise.
 %   Cookie -> session row -> user, or `none`. This cannot decline:
 %   px_env\'s pipeline treats a failing step as "skip it, Env flows on
 %   unchanged" -- fine for a step that adds nothing, wrong for one
-%   whose whole job is to guarantee Env.user is always readable by
-%   whatever runs after it.
+%   whose whole job is to guarantee the env\'s `user` key is always
+%   readable by whatever runs after it.
 authenticate(Env0, Env) :-
-    (   px_env:cookie(Env0, px_session, Token),
+    (   cookie(Env0, px_session, Token),
         session_user(Token, User)
-    ->  Env = Env0.put(user, User)
-    ;   Env = Env0.put(user, none)
+    ->  put_env(Env0, user, User, Env)
+    ;   put_env(Env0, user, none, Env)
     ).
 
 %!  current_user(+Env, -User) is semidet.
 %
 %   Fails when nobody is signed in. User is the full users row --
 %   INCLUDING password_hash -- so read only the fields a view needs
-%   (User.email, User.id, ...); never render the whole dict.
+%   with field/3 (field(User, email, Email), field(User, id, Id), ...);
+%   never pass the whole row down to a template.
 current_user(Env, User) :-
-    get_dict(user, Env, User),
+    env_get(Env, user, User),
     User \\== none.
 
 %!  signed_in(+Env) is semidet.

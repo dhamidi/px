@@ -145,60 +145,58 @@ expect_before(Text, Sub1, Sub2) :-
 %   undeclared params dropped, blank optional select kept as "".
 test(valid_params_typed_ok) :-
     form_validate(gadget_form,
-                  _{ title: "Widget",
-                     quantity: "5",
-                     featured: "on",
-                     color: "red",
-                     sku: "G-42",
-                     secret: "hunter2hunter2",
-                     hacker_field: "1; DROP TABLE gadgets" },
+                  [ title-"Widget",
+                    quantity-"5",
+                    featured-"on",
+                    color-"red",
+                    sku-"G-42",
+                    secret-"hunter2hunter2",
+                    hacker_field-"1; DROP TABLE gadgets" ],
                   R),
     expect(R = ok(Values)),
-    expect(Values.title == "Widget"),
-    expect(Values.quantity == 5),          % a number, not "5"
-    expect(Values.featured == true),
-    expect(Values.color == "red"),
-    expect(Values.size == ""),             % blank optional select
-    expect(Values.sku == "G-42"),
-    expect(Values.secret == "hunter2hunter2"),
-    expect(\+ get_dict(hacker_field, Values, _)).   % declared fields only
+    expect(field_value(Values, title, "Widget")),
+    expect(field_value(Values, quantity, 5)),      % a number, not "5"
+    expect(field_value(Values, featured, true)),
+    expect(field_value(Values, color, "red")),
+    expect(field_value(Values, size, "")),         % blank optional select
+    expect(field_value(Values, sku, "G-42")),
+    expect(field_value(Values, secret, "hunter2hunter2")),
+    expect(\+ memberchk(hacker_field-_, Values)).   % declared fields only
 
 %   Two errors; raw input preserved exactly (the failed "12x" cast
 %   included); absent fields "" / checkbox false; declaration order.
 test(two_errors_preserve_raw) :-
     form_validate(gadget_form,
-                  _{ title: "",
-                     quantity: "12x",
-                     color: "red" },
+                  [ title-"", quantity-"12x", color-"red" ],
                   R),
     expect(R = invalid(Values, Errors)),
     expect(Errors == [ error(title, "is required"),
                        error(quantity, "must be a number") ]),
-    expect(Values.title == ""),
-    expect(Values.quantity == "12x"),      % raw, exactly as typed
-    expect(Values.featured == false),      % absent checkbox
-    expect(Values.color == "red"),
-    expect(Values.size == ""),
-    expect(Values.sku == "").
+    expect(field_value(Values, title, "")),
+    expect(field_value(Values, quantity, "12x")),  % raw, exactly as typed
+    expect(field_value(Values, featured, false)),  % absent checkbox
+    expect(field_value(Values, color, "red")),
+    expect(field_value(Values, size, "")),
+    expect(field_value(Values, sku, "")).
 
 %   Blank non-required fields skip remaining constraints: quantity ""
 %   is not "must be a number", sku "" skips check/2.
 test(blank_non_required_skips) :-
     form_validate(gadget_form,
-                  _{ title: "Sprocket", quantity: "", color: "blue", sku: "" },
+                  [ title-"Sprocket", quantity-"", color-"blue", sku-"" ],
                   R),
     expect(R = ok(Values)),
-    expect(Values.quantity == ""),
-    expect(Values.sku == "").
+    expect(field_value(Values, quantity, "")),
+    expect(field_value(Values, sku, "")).
 
 %   First failing constraint per field wins, one error per field:
 %   max_length on title, range on quantity, check/2 message on sku.
 test(first_failing_constraint_wins) :-
     form_validate(gadget_form,
-                  _{ title: "An excessively long gadget title",
-                     quantity: "99",
-                     color: "red",
-                     sku: "X-1" },
+                  [ title-"An excessively long gadget title",
+                    quantity-"99",
+                    color-"red",
+                    sku-"X-1" ],
                   R),
     expect(R = invalid(_, Errors)),
     expect(Errors == [ error(title, "must be at most 20 characters"),
@@ -210,7 +208,7 @@ test(first_failing_constraint_wins) :-
 %   goal-computed options).
 test(tampered_select_rejected) :-
     form_validate(gadget_form,
-                  _{ title: "Widget", color: "green", size: "xxl" },
+                  [ title-"Widget", color-"green", size-"xxl" ],
                   R),
     expect(R = invalid(_, Errors)),
     expect(Errors == [ error(color, "is not a valid choice"),
@@ -222,26 +220,26 @@ test(tampered_select_rejected) :-
      [ field(tos, checkbox, [required]) ]).
 
 test(checkbox_required_means_checked) :-
-    form_validate(tos_form, _{}, R1),
+    form_validate(tos_form, [], R1),
     expect(R1 = invalid(V1, [error(tos, "is required")])),
-    expect(V1.tos == false),
-    Env = env{ params: _{tos: "on"} },
+    expect(field_value(V1, tos, false)),
+    Env = [params-[tos-"on"]],
     form_result(tos_form, Env, R2),
     expect(R2 = ok(V2)),
-    expect(V2.tos == true).
+    expect(field_value(V2, tos, true)).
 
 % ---------------------------------------------------------------------
 % Rendering tests.
 % ---------------------------------------------------------------------
 
 test(form_for_rendering) :-
-    Values = _{ title: "A \"quoted\" <gadget>",
-                quantity: "12x",
-                featured: true,
-                color: "blue",
-                size: "",
-                sku: "G-42",
-                secret: "hunter2hunter2" },
+    Values = [ title-"A \"quoted\" <gadget>",
+               quantity-"12x",
+               featured-true,
+               color-"blue",
+               size-"",
+               sku-"G-42",
+               secret-"hunter2hunter2" ],
     Errors = [ error(title, "is required"),
                error(quantity, "must be a number") ],
     render_to_string(form_for(gadget_form, patch(post_path(7)), Values, Errors),
@@ -290,7 +288,7 @@ test(form_for_rendering) :-
 %   Bare (non-wrapped) action term: no override input; empty values
 %   render no value attributes.
 test(field_input_escape_hatch) :-
-    render_to_string(form_for(gadget_form, posts_path, _{}, []), EmptyHtml),
+    render_to_string(form_for(gadget_form, posts_path, [], []), EmptyHtml),
     expect_sub(EmptyHtml, "<form action=\"/posts\" method=\"post\">"),
     expect_no_sub(EmptyHtml, "_method"),
     expect_no_sub(EmptyHtml, "value=\"\""),
@@ -298,12 +296,12 @@ test(field_input_escape_hatch) :-
     expect_no_sub(EmptyHtml, "field-error"),
     % the per-field escape hatch: input + adjacent error, nothing else
     render_to_string(field_input(gadget_form, title,
-                                 _{title: "Sprocket"},
+                                 [title-"Sprocket"],
                                  [error(title, "is required")]),
                      Html),
     expect(Html ==
         "<input type=\"text\" name=\"title\" id=\"gadget_form_title\" value=\"Sprocket\"><p class=\"error\">is required</p>"),
-    render_to_string(field_input(gadget_form, title, _{title: "Ok"}, []),
+    render_to_string(field_input(gadget_form, title, [title-"Ok"], []),
                      Html2),
     expect_no_sub(Html2, "<label"),
     expect_no_sub(Html2, "error").

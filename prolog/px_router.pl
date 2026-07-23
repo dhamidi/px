@@ -62,8 +62,8 @@ px_env:set_pipeline/1):
 
     method_override/2 -- Rails' _method convention: a POST whose
         params carry _method in {patch, put, delete} is rewritten to
-        that method (original preserved at Env.request.raw_method).
-        Runs BEFORE route_dispatch.
+        that method (original preserved at the flat env key
+        raw_method). Runs BEFORE route_dispatch.
 
     route_dispatch/2 -- match Env.method + Env.path against the
         route store via v1's match_route/4, merge the matched path
@@ -381,17 +381,18 @@ px_template:eval_attr_value(PathTerm, Path) :-
 %   adr/0018 section 5, Rails' _method convention.  Only a POST may
 %   be overridden; only patch, put and delete are legal targets --
 %   a form cannot smuggle itself into being a GET or invent methods.
-%   On override, Env.method is rewritten and the original preserved
-%   at Env.request.raw_method; everything downstream (route matching
-%   included) sees the overridden method and never knows the
-%   difference.  Not applicable: the env passes through unchanged.
+%   On override, the env's method key is rewritten and the original
+%   preserved at the flat key raw_method; everything downstream
+%   (route matching included) sees the overridden method and never
+%   knows the difference.  Not applicable: the env passes through
+%   unchanged.
 method_override(Env0, Env) :-
-    (   get_dict(method, Env0, post),
-        get_dict(params, Env0, Params),
-        get_dict('_method', Params, Override0),
+    (   env_get(Env0, method, post),
+        param(Env0, '_method', Override0),
         method_atom(Override0, Override),
         memberchk(Override, [patch, put, delete])
-    ->  Env = Env0.put(method, Override).put(request/raw_method, post)
+    ->  put_env(Env0, method, Override, Env1),
+        put_env(Env1, raw_method, post, Env)
     ;   Env = Env0
     ).
 
@@ -414,19 +415,18 @@ method_atom(V, A) :-
 %   predicate FAILS -- the pipeline treats that as declined and
 %   px_env's finalizer produces the 404.
 route_dispatch(Env0, Env) :-
-    get_dict(method, Env0, Method),
-    get_dict(path, Env0, Path),
+    env_get(Env0, method, Method),
+    env_get(Env0, path, Path),
     router:match_route(Method, Path, Handler, Params),
-    path_params_dict(Params, ParamsDict),
-    px_env:env_merge_params(Env0, ParamsDict, Env1),
+    path_params_pairs(Params, ParamPairs),
+    px_env:env_merge_params(Env0, ParamPairs, Env1),
     call(Handler, Env1, Env).
 
 %   match_route/4 yields params as Name=Value pairs with atom values
-%   (path segments); env params are a dict of atom keys to STRING
-%   values (adr/0017), so convert on the way in.
-path_params_dict(Pairs, Dict) :-
-    foldl(put_path_param, Pairs, _{}, Dict).
+%   (path segments); env params are a Key-Value pairs list of atom
+%   keys to STRING values (adr/0017), so convert on the way in.
+path_params_pairs(Pairs, ParamPairs) :-
+    maplist(path_param_pair, Pairs, ParamPairs).
 
-put_path_param(Name=Value0, Dict0, Dict) :-
-    atom_string(Value0, Value),
-    put_dict(Name, Dict0, Value, Dict).
+path_param_pair(Name=Value0, Name-Value) :-
+    atom_string(Value0, Value).

@@ -17,8 +17,19 @@ database; the schema rides with it.
              created_at text not null default current_timestamp)").
 
 load_comments(Comments) :-
-    findall(C, row(q(comments, [order_by(desc(id))]), C), Comments).
+    findall(C,
+            ( row(q(comments, [order_by(desc(id))]), R),
+              project_comment(R, C) ),
+            Comments).
 
 save_comment(Values, Comment) :-
     insert(comments, Values, Id),
-    once(row(q(comments, [where(id == Id)]), Comment)).
+    once(row(q(comments, [where(id == Id)]), R)),
+    project_comment(R, Comment).
+
+%   A row is a pairs list (adr/0037); project it into a plain
+%   comment/3 term so the view destructures named vars, never a row.
+project_comment(R, comment(Author, Body, CreatedAt)) :-
+    field(R, author, Author),
+    field(R, body, Body),
+    field(R, created_at, CreatedAt).

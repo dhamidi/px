@@ -62,6 +62,12 @@
 %   -- both user:term_expansion -- run for real, in their own module,
 %   exactly as app/pages/widgets.pl would load.
 
+%   The fixture's model is a plain tagged compound (adr/0037 decision
+%   3): page(Id, Name). field_value/3 is reached qualified as
+%   px_form:field_value/3 because library(prologex) does not reexport
+%   it (only path_id/3 from px_env) -- exactly the mechanical
+%   Env.params.id -> path_id/3 / Row.col -> field/3 style migration
+%   the ADR calls for, here for a form's Values pairs list.
 widget_page_source(Dir, "
 :- module(widget_page, []).
 
@@ -74,26 +80,24 @@ widget_page_source(Dir, "
 :- dynamic widget_name/2.
 widget_name(7, \"Widget Seven\").
 
-model(main, Env, m{id: Id, name: Name}) :-
-    IdS = Env.params.id,
-    number_string(IdN, IdS),
-    widget_name(IdN, Name),
-    Id = IdN.
+model(main, Env, page(Id, Name)) :-
+    path_id(Env, id, Id),
+    widget_name(Id, Name).
 
-view(main, M, layout(\"Widget\",
-       [ h1([\"Widget #\", M.id]),
-         p(M.name)
+view(main, page(Id, Name), layout(\"Widget\",
+       [ h1([\"Widget #\", Id]),
+         p(Name)
        ])).
 
-update(rename(ok(V)), M0, M, [status(201)]) :-
-    retractall(widget_name(M0.id, _)),
-    assertz(widget_name(M0.id, V.name)),
-    M = M0.put(name, V.name).
-update(rename(invalid(V, _Errors)), M0, M, [status(422)]) :-
-    M = M0.put(name, V.name).
+update(rename(ok(V)), page(Id, _), page(Id, Name), [status(201)]) :-
+    px_form:field_value(V, name, Name),
+    retractall(widget_name(Id, _)),
+    assertz(widget_name(Id, Name)).
+update(rename(invalid(V, _Errors)), page(Id, _), page(Id, Name), [status(422)]) :-
+    px_form:field_value(V, name, Name).
 update(poke(_Params), M, M, [status(204)]).
-update(go(_Params), M, M, Effects) :-
-    Effects = [redirect(widget_page_path(M.id))].
+update(go(_Params), page(Id, Name), page(Id, Name),
+       [redirect(widget_page_path(Id))]).
 update(boom(_Params), M, M, [nonsense(x)]).
 ") :- atom(Dir).
 
@@ -169,18 +173,19 @@ contains(Text, Sub) :-
 		 *          ENV BUILDERS        *
 		 *******************************/
 
-%   The adr/0017 request-dict shape px_env:make_env/4 expects (same as
-%   milestone11); query params always parse regardless of method, so a
-%   POST's message params ride the URL here rather than the body --
-%   env_merge_params/3 afterwards mimics the router's path-param merge
-%   (path params win), same as route_dispatch/2 would do for real.
+%   The adr/0017/0037 request shape px_env:make_env/4 expects (same as
+%   milestone11): a bare http_request/4 compound. Query params always
+%   parse regardless of method, so a POST's message params ride the
+%   URL here rather than the body -- env_merge_params/3 afterwards
+%   mimics the router's path-param merge (path params win, as a pairs
+%   list), same as route_dispatch/2 would do for real.
 
-fake_request(Method, Url, _{method: Method, url: Url, headers: [], body: ""}).
+fake_request(Method, Url, http_request(Method, Url, [], "")).
 
 widget_env(Method, PathWithQuery, IdParam, Env) :-
     fake_request(Method, PathWithQuery, Request),
     px_env:make_env(Request, user_output, 1, Env0),
-    px_env:env_merge_params(Env0, _{id: IdParam}, Env).
+    px_env:env_merge_params(Env0, [id-IdParam], Env).
 
 get_env(Path, IdParam, Env)  :- widget_env('GET',  Path, IdParam, Env).
 post_env(Path, IdParam, Env) :- widget_env('POST', Path, IdParam, Env).
@@ -234,7 +239,7 @@ test(ensure_layout_installs_default) :-
 test(get_cycle_renders_model) :-
     get_env("/widgets/7", "7", Env0),
     px_controller:serve_get(widget_page, main, Env0, Env),
-    Env.response.status == 200,
+    px_env:env_get(Env, response, response(200, _, _)),
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 200 OK"),
     contains(Out, "Widget #7"),
@@ -243,7 +248,7 @@ test(get_cycle_renders_model) :-
 test(model_failure_is_404) :-
     get_env("/widgets/999", "999", Env0),
     px_controller:serve_get(widget_page, main, Env0, Env),
-    Env.response.status == 404,
+    px_env:env_get(Env, response, response(404, _, _)),
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 404 Not Found"),
     contains(Out, "404 Not Found").
@@ -256,7 +261,7 @@ test(model_failure_is_404) :-
 test(message_rename_ok_status_201) :-
     post_env("/widgets/7?_msg=rename&name=Bob", "7", Env0),
     px_controller:serve_msg(widget_page, main, Env0, Env),
-    Env.response.status == 201,
+    px_env:env_get(Env, response, response(201, _, _)),
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 201"),
     contains(Out, "Bob"),
@@ -265,7 +270,7 @@ test(message_rename_ok_status_201) :-
 test(message_rename_invalid_status_422) :-
     post_env("/widgets/7?_msg=rename&name=", "7", Env0),
     px_controller:serve_msg(widget_page, main, Env0, Env),
-    Env.response.status == 422,
+    px_env:env_get(Env, response, response(422, _, _)),
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 422").
 
@@ -273,25 +278,25 @@ test(message_rename_invalid_status_422) :-
 %   (adr/0027 decision 3).
 test(single_form_fallback) :-
     post_env("/widgets/7?name=Carol", "7", Env0),
-    \+ get_dict('_msg', Env0.params, _),
+    \+ px_env:param(Env0, '_msg', _),
     px_controller:serve_msg(widget_page, main, Env0, Env),
-    Env.response.status == 201,
+    px_env:env_get(Env, response, response(201, _, _)),
     capture_response(Env, Out),
     contains(Out, "Carol"),
     widget_page:widget_name(7, "Carol").
 
 %   `_msg=poke` names no declared form: decode_msg/3 falls to
-%   Name(Params) with the raw params dict, and update/4's clause for
-%   poke/1 has no matching :- form(poke, ...) at all.
+%   Name(Params) with the raw params pairs list, and update/4's clause
+%   for poke/1 has no matching :- form(poke, ...) at all.
 test(formless_message_decodes_to_params) :-
     post_env("/widgets/7?_msg=poke&foo=bar", "7", Env0),
     px_controller:decode_msg(widget_page, Env0, Msg),
-    Msg = poke(ParamsDict),
-    is_dict(ParamsDict),
-    get_dict('_msg', ParamsDict, "poke"),
-    get_dict(foo, ParamsDict, "bar"),
+    Msg = poke(Params),
+    is_list(Params),
+    memberchk('_msg'-"poke", Params),
+    memberchk(foo-"bar", Params),
     px_controller:serve_msg(widget_page, main, Env0, Env),
-    Env.response.status == 204,
+    px_env:env_get(Env, response, response(204, _, _)),
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 204").
 
@@ -300,7 +305,7 @@ test(formless_message_decodes_to_params) :-
 test(redirect_effect) :-
     post_env("/widgets/7?_msg=go", "7", Env0),
     px_controller:serve_msg(widget_page, main, Env0, Env),
-    Env.response.status == 303,
+    px_env:env_get(Env, response, response(303, _, _)),
     capture_response(Env, Out),
     contains(Out, "HTTP/1.1 303 See Other"),
     contains(Out, "location: /widgets/7").

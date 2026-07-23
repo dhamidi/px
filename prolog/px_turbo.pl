@@ -85,7 +85,7 @@ in the layout):
      string building anywhere.
 */
 
-:- use_module(px_env, [respond/4, redirect/3]).
+:- use_module(px_env, [respond/4, redirect/3, header/3, env_get/3, put_env/4]).
 :- use_module(px_template, []).
 
 :- use_module(library(apply)).
@@ -118,7 +118,6 @@ dom_id_parts(T, [T|R], R) :- number(T), !.
 dom_id_parts(T, [T|R], R) :- string(T), !.
 dom_id_parts(T, Parts, Rest) :-
     compound(T),
-    \+ is_dict(T),
     !,
     compound_name_arguments(T, Name, Args),
     Parts = [Name|Parts1],
@@ -165,17 +164,13 @@ px_template:render_helper(turbo_frame(IdTerm, Content), S) :-
 %   fallback client-side.
 
 turbo_frames(Env0, Env) :-
-    get_dict(headers, Env0, ReqHeaders),
-    memberchk("turbo-frame"-FrameId, ReqHeaders),
-    get_dict(response, Env0, Response0),
-    get_dict(body, Response0, Body0),
+    header(Env0, "turbo-frame", FrameId),
+    env_get(Env0, response, response(Status, RespHeaders, Body0)),
     Body0 \== none,
     frame_subtree(Body0, FrameId, Frame),
-    get_dict(headers, Response0, RespHeaders),
-    put_dict(_{ body:    Frame,
-                headers: ["vary"-"Turbo-Frame"|RespHeaders] },
-             Response0, Response),
-    put_dict(response, Env0, Response, Env).
+    put_env(Env0, response,
+            response(Status, ["vary"-"Turbo-Frame"|RespHeaders], Frame),
+            Env).
 
 %!  frame_subtree(+Term, +WantedId, -Frame) is semidet.
 %
@@ -203,13 +198,7 @@ frame_subtree([X|Xs], Wanted, Frame) :-
     ).
 frame_subtree(Term, Wanted, Frame) :-
     compound(Term),
-    \+ is_dict(Term),
-    compound_name_arity(Term, Name, Arity),
-    (   Name == '.', Arity == 2, arg(1, Term, Dict), is_dict(Dict)
-    ->  arg(2, Term, Key),
-        get_dict(Key, Dict, Value),
-        frame_subtree(Value, Wanted, Frame)
-    ;   frame_goal_subtree(Term, Wanted, Frame)   % bare frame/each/template
+    (   frame_goal_subtree(Term, Wanted, Frame)   % bare frame/each/template
     ->  true
     ;   once(( arg(_, Term, Arg),
                frame_subtree(Arg, Wanted, Frame) ))
@@ -238,7 +227,7 @@ frame_goal_subtree(Goal, Wanted, Frame) :-
 
 %!  turbo_stream(+Env0, +Actions, -Env) is det.
 %
-%   Responder alongside respond/3 and redirect/3 -- a pure dict put,
+%   Responder alongside respond/3 and redirect/3 -- a pure put_env/4,
 %   no I/O.  Content type text/vnd.turbo-stream.html; body the term
 %   turbo_stream(Actions) (adr/0024's own shape), rendered at the
 %   transport edge by the render_helper below.  Actions are validated
@@ -325,6 +314,5 @@ turbo_or_redirect(Env0, PathTerm, Actions, Env) :-
 %   and what Rails checks (adr/0024, consequences).
 
 accepts_turbo_stream(Env) :-
-    get_dict(headers, Env, Headers),
-    memberchk("accept"-Accept, Headers),
+    header(Env, "accept", Accept),
     sub_string(Accept, _, _, _, "text/vnd.turbo-stream.html").

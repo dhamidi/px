@@ -6,18 +6,18 @@ out; they never see the env.
 
 :- use_module(library(prologex)).
 
-guestbook_view(M) ~>
+guestbook_view(guestbook(Comments, Values, Errors)) ~>
     layout("Guestbook — prologex",
       [ p(class(back), link_to("← all decisions", home_path)),
         h1("Guestbook"),
-        turbo_frame(comments, each(M.comments, comment_card)),
+        turbo_frame(comments, each(Comments, comment_card)),
         h2("Sign the guestbook"),
-        form_for(sign, guestbook_path, M.values, M.errors)
+        form_for(sign, guestbook_path, Values, Errors)
       ]).
 
-comment_card(C) ~>
+comment_card(comment(Author, Body, CreatedAt)) ~>
     article(class(card),
-      [ p(strong(C.author)),
-        p(C.body),
-        p(small(C.created_at))
+      [ p(strong(Author)),
+        p(Body),
+        p(small(CreatedAt))
       ]).

@@ -3,10 +3,11 @@
             use_db/1,                   % +DB
             row/2,                      % +Q, -Row
             row/3,                      % +DB, +Q, -Row
-            insert/3,                   % +Table, +Dict, -Id
-            insert/4,                   % +DB, +Table, +Dict, -Id
-            update/3,                   % +Table, +Dict, +WhereExpr
-            update/4,                   % +DB, +Table, +Dict, +WhereExpr
+            field/3,                    % +Row, +Column, -Value
+            insert/3,                   % +Table, +Pairs, -Id
+            insert/4,                   % +DB, +Table, +Pairs, -Id
+            update/3,                   % +Table, +Pairs, +WhereExpr
+            update/4,                   % +DB, +Table, +Pairs, +WhereExpr
             delete/2,                   % +Table, +WhereExpr
             delete/3,                   % +DB, +Table, +WhereExpr
             q_exec/2,                   % +SQL, +Params
@@ -191,8 +192,8 @@ select_fields([]) -->
 select_field(Agg) -->
     { nonvar(Agg), Agg =.. [Name, F], aggregate_name(Name) },
     !,
-    atom_codes_out(Name), "(", field(F), ")".
-select_field(F) --> field(F).
+    atom_codes_out(Name), "(", field_ref(F), ")".
+select_field(F) --> field_ref(F).
 
 aggregate_name(count).
 aggregate_name(sum).
@@ -214,7 +215,7 @@ join_kw(left)  --> " LEFT JOIN ".
 %   join condition, not a filter).
 on_condition(on(F1 == F2)) -->
     !,
-    field(F1), " = ", field(F2).
+    field_ref(F1), " = ", field_ref(F2).
 on_condition(On) -->
     { throw(error(domain_error(join_condition, On), context(px_query:sql/3, _))) }.
 
@@ -244,27 +245,27 @@ conj([E|Es], P0, P) --> expr(E, P0, P1), " AND ", conj(Es, P1, P).
 %   expr(+E, ?P0, ?P)// -- compile one condition; parameters are
 %   emitted into the P0..P difference list in textual order.
 
-expr(F == V,  P0, P) --> !, field(F), " = ",  rhs(V, P0, P).
-expr(F \== V, P0, P) --> !, field(F), " <> ", rhs(V, P0, P).
-expr(F < V,   P0, P) --> !, field(F), " < ",  rhs(V, P0, P).
-expr(F > V,   P0, P) --> !, field(F), " > ",  rhs(V, P0, P).
-expr(F =< V,  P0, P) --> !, field(F), " <= ", rhs(V, P0, P).
-expr(F >= V,  P0, P) --> !, field(F), " >= ", rhs(V, P0, P).
-expr(like(F, Pat), P0, P) --> !, field(F), " LIKE ?", { P0 = [Pat|P] }.
+expr(F == V,  P0, P) --> !, field_ref(F), " = ",  rhs(V, P0, P).
+expr(F \== V, P0, P) --> !, field_ref(F), " <> ", rhs(V, P0, P).
+expr(F < V,   P0, P) --> !, field_ref(F), " < ",  rhs(V, P0, P).
+expr(F > V,   P0, P) --> !, field_ref(F), " > ",  rhs(V, P0, P).
+expr(F =< V,  P0, P) --> !, field_ref(F), " <= ", rhs(V, P0, P).
+expr(F >= V,  P0, P) --> !, field_ref(F), " >= ", rhs(V, P0, P).
+expr(like(F, Pat), P0, P) --> !, field_ref(F), " LIKE ?", { P0 = [Pat|P] }.
 %   Empty in/2 compiles to the always-false 1 = 0 (SQLite rejects
 %   `IN ()`), exactly as Sequel does.
 expr(in(_, []), P, P) --> !, "1 = 0".
 expr(in(F, Vs), P0, P) -->
     { is_list(Vs) },
     !,
-    field(F), " IN (", placeholders(Vs, P0, P), ")".
-expr(is_null(F), P, P) --> !, field(F), " IS NULL".
-expr(\+ is_null(F), P, P) --> !, field(F), " IS NOT NULL".
+    field_ref(F), " IN (", placeholders(Vs, P0, P), ")".
+expr(is_null(F), P, P) --> !, field_ref(F), " IS NULL".
+expr(\+ is_null(F), P, P) --> !, field_ref(F), " IS NOT NULL".
 expr(\+ in(_, []), P, P) --> !, "1 = 1".
 expr(\+ in(F, Vs), P0, P) -->
     { is_list(Vs) },
     !,
-    field(F), " NOT IN (", placeholders(Vs, P0, P), ")".
+    field_ref(F), " NOT IN (", placeholders(Vs, P0, P), ")".
 expr(\+ E, P0, P) --> !, "NOT (", expr(E, P0, P), ")".
 expr(and(A, B), P0, P) --> !, "(", expr(A, P0, P1), " AND ", expr(B, P1, P), ")".
 expr(or(A, B),  P0, P) --> !, "(", expr(A, P0, P1), " OR ",  expr(B, P1, P), ")".
@@ -278,7 +279,7 @@ expr(E, _, _) -->
 %   Right-hand side of a comparison: a value becomes a ? placeholder;
 %   field(F) marks an explicit field reference (column-to-column
 %   comparison inside where/1).
-rhs(field(F), P, P) --> !, field(F).
+rhs(field(F), P, P) --> !, field_ref(F).
 rhs(V, P0, P) --> "?", { P0 = [V|P] }.
 
 placeholders([V], P0, P) --> !, "?", { P0 = [V|P] }.
@@ -289,8 +290,8 @@ placeholders([V|Vs], P0, P) --> "?, ", { P0 = [V|P1] }, placeholders(Vs, P1, P).
 group_part([]) --> !.
 group_part(Gs) --> " GROUP BY ", field_list(Gs).
 
-field_list([F]) --> !, field(F).
-field_list([F|Fs]) --> field(F), ", ", field_list(Fs).
+field_list([F]) --> !, field_ref(F).
+field_list([F|Fs]) --> field_ref(F), ", ", field_list(Fs).
 
 order_part([]) --> !.
 order_part(Os) --> " ORDER BY ", order_keys(Os).
@@ -298,9 +299,9 @@ order_part(Os) --> " ORDER BY ", order_keys(Os).
 order_keys([O]) --> !, order_key(O).
 order_keys([O|Os]) --> order_key(O), ", ", order_keys(Os).
 
-order_key(desc(F)) --> !, field(F), " DESC".
-order_key(asc(F))  --> !, field(F), " ASC".
-order_key(F) --> field(F).
+order_key(desc(F)) --> !, field_ref(F), " DESC".
+order_key(asc(F))  --> !, field_ref(F), " ASC".
+order_key(F) --> field_ref(F).
 
 % --- LIMIT / OFFSET -------------------------------------------------
 
@@ -316,10 +317,13 @@ limit_part(none, some(O), P0, P) --> " LIMIT -1 OFFSET ?", { P0 = [O|P] }.
 % --- Field references and identifiers ------------------------------
 
 %   A field reference is an atom (title) or Table/Field
-%   (posts/title -> posts.title). Both parts are validated.
+%   (posts/title -> posts.title). Both parts are validated. Named
+%   field_ref//1 (not field//1) so the DCG expansion (which adds two
+%   difference-list args, making this predicate field_ref/3) does not
+%   collide with the public row accessor field/3 (adr/0037 decision 4).
 
-field(T/F) --> !, ident(T), ".", ident(F).
-field(F) --> ident(F).
+field_ref(T/F) --> !, ident(T), ".", ident(F).
+field_ref(F) --> ident(F).
 
 %   The identifier whitelist: atoms matching [a-z_][a-z0-9_]*.
 %   Everything else throws before any SQL text exists (see the module
@@ -375,9 +379,10 @@ all_ident_chars([C|Cs]) :- ident_char(C), all_ident_chars(Cs).
 %   explicit connection, for scripts, tests, and tools. Each solution
 %   is one sqlite3_step (adr/0020's db_row/4): backtracking streams,
 %   once/1 stops early, findall/3 is the explicit way to get a list.
-%   Row is a dict tagged with the primary table name, keyed by the
-%   selected column names: posts{id: 7, title: "Hello"}. Rows from
-%   the sql(Text, Params) escape hatch keep px_db's `row` tag.
+%   Row is a Key-Value pairs list keyed by the selected column names:
+%   [id-7, title-"Hello"] (adr/0037 decision 4). Use field/3 to read
+%   one column; the model is expected to destructure the row into
+%   named parts rather than carry it further.
 
 row(Q, Row) :-
     this_db(DB),
@@ -385,35 +390,46 @@ row(Q, Row) :-
 
 row(DB, Q, Row) :-
     sql(Q, SQL, Params),                 % validates before any I/O
-    row_tag(Q, Tag),
-    db_row(DB, SQL, Params, Row0),
-    dict_pairs(Row0, _, Pairs),
-    dict_pairs(Row, Tag, Pairs).
+    db_row(DB, SQL, Params, Row).
 
-row_tag(q(Table, _), Table) :- !.
-row_tag(_, row).
+%!  field(+Row, +Column, -Value) is det.
+%
+%   True when Value is the value of Column in Row (a row produced by
+%   row/2 or row/3). Column is an atom. Deterministic; throws
+%   existence_error(column, Column) if Row has no such column -- a
+%   typo'd column name must fail loudly, not silently (adr/0037
+%   decision 4, the whole point vs. dicts).
+
+field(Row, Column, Value) :-
+    must_be(atom, Column),
+    (   memberchk(Column-Value0, Row)
+    ->  Value = Value0
+    ;   throw(error(existence_error(column, Column),
+                    context(px_query:field/3, _)))
+    ).
 
 
 		 /*******************************
 		 *           WRITES             *
 		 *******************************/
 
-%!  insert(+Table, +Dict, -Id) is det.
-%!  insert(+DB, +Table, +Dict, -Id) is det.
+%!  insert(+Table, +Pairs, -Id) is det.
+%!  insert(+DB, +Table, +Pairs, -Id) is det.
 %
 %   INSERT INTO Table (k1, ...) VALUES (?, ...); Id unifies with
-%   last_insert_rowid(). Columns come from the dict's keys, each
-%   validated as an identifier; values are all ?-bound.
+%   last_insert_rowid(). Pairs is a Key-Value pairs list
+%   [col-val, ...] (adr/0037 decision 4); columns come from its keys,
+%   each validated as an identifier, values are all ?-bound.
 
-insert(Table, Dict, Id) :-
+insert(Table, Pairs, Id) :-
     this_db(DB),
-    insert(DB, Table, Dict, Id).
+    insert(DB, Table, Pairs, Id).
 
-insert(DB, Table, Dict, Id) :-
+insert(DB, Table, Pairs, Id) :-
     valid_identifier(Table),
-    dict_pairs(Dict, _, Pairs),
+    must_be(list, Pairs),
     (   Pairs == []
-    ->  throw(error(domain_error(nonempty_dict, Dict),
+    ->  throw(error(domain_error(nonempty_pairs, Pairs),
                     context(px_query:insert/4, _)))
     ;   true
     ),
@@ -432,22 +448,23 @@ n_placeholders(N, ['?'|Marks]) :-
     N1 is N - 1,
     n_placeholders(N1, Marks).
 
-%!  update(+Table, +Dict, +WhereExpr) is det.
-%!  update(+DB, +Table, +Dict, +WhereExpr) is det.
+%!  update(+Table, +Pairs, +WhereExpr) is det.
+%!  update(+DB, +Table, +Pairs, +WhereExpr) is det.
 %
 %   UPDATE Table SET k1 = ?, ... WHERE ...; WhereExpr is the same
 %   expression language as where/1 (a list means conjunction; the
-%   empty list means no WHERE clause -- all rows).
+%   empty list means no WHERE clause -- all rows). Pairs is a
+%   Key-Value pairs list [col-val, ...] (adr/0037 decision 4).
 
-update(Table, Dict, WhereExpr) :-
+update(Table, Pairs, WhereExpr) :-
     this_db(DB),
-    update(DB, Table, Dict, WhereExpr).
+    update(DB, Table, Pairs, WhereExpr).
 
-update(DB, Table, Dict, WhereExpr) :-
+update(DB, Table, Pairs, WhereExpr) :-
     valid_identifier(Table),
-    dict_pairs(Dict, _, Pairs),
+    must_be(list, Pairs),
     (   Pairs == []
-    ->  throw(error(domain_error(nonempty_dict, Dict),
+    ->  throw(error(domain_error(nonempty_pairs, Pairs),
                     context(px_query:update/4, _)))
     ;   true
     ),

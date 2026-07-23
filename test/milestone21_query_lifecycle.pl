@@ -70,12 +70,12 @@ run_tests([T|Ts], F0, F) :-
 %   be readable back.
 test(delete_loop_then_insert) :-
     forall(between(1, 5, K),
-           ( atom_concat(a, K, V), insert(t, _{v: V}, _) )),
-    findall(Id, ( row(q(t, []), R), Id = R.id ), Ids),
+           ( atom_concat(a, K, V), insert(t, [v-V], _) )),
+    findall(Id, ( row(q(t, []), R), field(R, id, Id) ), Ids),
     forall(member(Id, Ids), delete(t, id == Id)),
-    insert(t, _{v: "after_delete_loop"}, NewId),
+    insert(t, [v-"after_delete_loop"], NewId),
     once(row(q(t, [where(id == NewId)]), Row)),
-    Row.v == "after_delete_loop",
+    field(Row, v, "after_delete_loop"),
     delete(t, id == NewId).
 
 %   Take the first solution of a multi-row query and stop (once/1),
@@ -84,23 +84,23 @@ test(delete_loop_then_insert) :-
 %   would block/fail.
 test(row_early_exit_then_insert) :-
     forall(between(1, 10, K),
-           ( atom_concat(b, K, V), insert(t, _{v: V}, _) )),
+           ( atom_concat(b, K, V), insert(t, [v-V], _) )),
     once(row(q(t, [order_by(asc(id))]), _)),   % grab one, drop the rest
-    insert(t, _{v: "after_early_exit"}, NewId),
+    insert(t, [v-"after_early_exit"], NewId),
     once(row(q(t, [where(id == NewId)]), Row)),
-    Row.v == "after_early_exit",
+    field(Row, v, "after_early_exit"),
     delete(t, []).                              % clear the table
 
 %   Sustained pressure: 200 rounds of insert-5 / delete-each / and a
 %   final write that must still land.
 test(heavy_cycles) :-
     forall(between(1, 200, _), one_cycle),
-    insert(t, _{v: "final"}, FId),
+    insert(t, [v-"final"], FId),
     once(row(q(t, [where(id == FId)]), Row)),
-    Row.v == "final".
+    field(Row, v, "final").
 
 one_cycle :-
     forall(between(1, 5, K),
-           ( atom_concat(c, K, V), insert(t, _{v: V}, _) )),
-    findall(Id, ( row(q(t, []), R), Id = R.id ), Ids),
+           ( atom_concat(c, K, V), insert(t, [v-V], _) )),
+    findall(Id, ( row(q(t, []), R), field(R, id, Id) ), Ids),
     forall(member(Id, Ids), delete(t, id == Id)).

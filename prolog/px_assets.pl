@@ -56,7 +56,7 @@ branch is untouched.
 :- use_module(library(lists)).
 :- use_module(library(error)).
 
-:- use_module(px_env,      [respond/3, respond/4, not_found/2]).
+:- use_module(px_env,      [respond/3, respond/4, not_found/2, param/3, header/3]).
 :- use_module(px_template, [render_tag/4]).
 
 %   prolog_load_context/2 only answers inside a directive running AT
@@ -216,7 +216,7 @@ relative_logical_name(SrcDir, Path, Logical) :-
 %
 %   "<basename-without-extension>-<first-12-hex-of-sha256>.<ext>", as
 %   a STRING -- the type manifest_entry/2 uses throughout (matching
-%   what a JSON round-trip and Env.params values are: adr/0017 path/
+%   what a JSON round-trip and param/3 values are: adr/0017 path/
 %   query params are always strings, and that is exactly what
 %   serve_asset/2 compares a requested filename against). A file with
 %   no extension gets no trailing dot.
@@ -405,7 +405,7 @@ to_string(T, S) :- atom(T),   !, atom_string(T, S).
 %   and a ".gz" sibling exists, that sibling's bytes are served with
 %   content-encoding: gzip and vary: accept-encoding instead.
 serve_asset(Env0, Env) :-
-    File = Env0.params.file,
+    param(Env0, file, File),
     ensure_manifest_loaded,
     (   manifest_entry(_, File)
     ->  public_assets_dir(Dir),
@@ -471,7 +471,7 @@ serve_asset(Env0, Env) :-
 %   rejected outright (assets/ has no manifest whitelist in dev, so
 %   this is the only guard against escaping assets/ via the path).
 serve_asset_dev(Env0, Env) :-
-    File = Env0.params.file,
+    param(Env0, file, File),
     to_string(File, FileS),
     (   safe_dev_asset_path(FileS)
     ->  assets_source_dir(SrcDir),
@@ -499,8 +499,7 @@ gz_blob_key(File, GzKey) :-
     string_concat(FileS, ".gz", GzKey).
 
 accepts_gzip(Env0) :-
-    get_dict(headers, Env0, Headers),
-    member("accept-encoding"-Value, Headers),
+    header(Env0, "accept-encoding", Value),
     sub_string(Value, _, _, _, "gzip"),
     !.
 

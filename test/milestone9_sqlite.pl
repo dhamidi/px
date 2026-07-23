@@ -8,7 +8,8 @@
    temporary on-disk database file (on disk rather than :memory: so the
    WAL/busy_timeout pragmas in db_open/2 run for real) and proves:
 
-   (a) db_row/4 enumerates all inserted rows as dicts on backtracking;
+   (a) db_row/4 enumerates all inserted rows as Key-Value pairs lists
+       on backtracking;
    (b) once(db_row(...)) terminates the cursor early AND the statement is
        finalized by setup_call_cleanup -- proven by db_close/1 succeeding
        right after (sqlite3_close throws SQLITE_BUSY if any statement is
@@ -32,7 +33,7 @@ check(Name, Goal) :-
 
 count_posts(DB, N) :-
     once(db_row(DB, "SELECT COUNT(*) AS n FROM posts", [], Row)),
-    N = Row.n.
+    memberchk(n-N, Row).
 
 main(_Argv) :-
     tmp_file_stream(text, Path, TmpStream),
@@ -67,23 +68,22 @@ run_all(Path) :-
     db_changes(DB, Changes),
     check('db_changes after single-row insert = 1', Changes == 1),
 
-    % (a) db_row/4 enumerates all rows as dicts on backtracking.
+    % (a) db_row/4 enumerates all rows as Key-Value pairs lists on
+    % backtracking.
     findall(Row, db_row(DB, "SELECT id, title, score FROM posts ORDER BY id", [], Row),
             Rows),
     format("rows: ~q~n", [Rows]),
     length(Rows, NRows),
     check('(a) db_row yields 3 solutions on backtracking', NRows == 3),
     Rows = [R1, R2, R3],
-    check('(a) rows are dicts tagged row', (is_dict(R1, row), is_dict(R2, row), is_dict(R3, row))),
-    check('(a) field values via dict keys', (R1.title == "first", R2.id == 2, R3.score == 3.5)),
+    check('(a) rows are Key-Value pairs lists', (is_list(R1), is_list(R2), is_list(R3))),
+    check('(a) field values via memberchk',
+          (memberchk(title-"first", R1), memberchk(id-2, R2), memberchk(score-3.5, R3))),
 
     % (b) once/1 = early termination; cleanup finalized the statement.
-    % (get_dict/3 rather than dot notation here and below where the dict
-    % is bound inside the checked goal: SWI hoists dot expansions to
-    % before the enclosing meta-call, where the dict is still unbound.)
     check('(b) once(db_row(...)) succeeds with the first row only',
           ( once(db_row(DB, "SELECT title FROM posts ORDER BY id", [], First)),
-            get_dict(title, First, FT), FT == "first" )),
+            memberchk(title-FT, First), FT == "first" )),
     % sqlite3_close throws SQLITE_BUSY if any statement is still live, so
     % closing (then reopening for the remaining checks) proves the once/1
     % above did not leak its statement.
@@ -124,12 +124,16 @@ run_all(Path) :-
             [42, 3.25, "hello", null]),
     once(db_row(DB2, "SELECT i, f, s, n FROM typed", [], T)),
     format("typed row: ~q~n", [T]),
-    check('(e) integer round-trips as integer', (integer(T.i), T.i == 42)),
-    check('(e) float round-trips as float',     (float(T.f),   T.f == 3.25)),
-    check('(e) string round-trips as string',   (string(T.s),  T.s == "hello")),
-    check('(e) null round-trips as the atom null', T.n == null),
+    check('(e) integer round-trips as integer',
+          (memberchk(i-TI, T), integer(TI), TI == 42)),
+    check('(e) float round-trips as float',
+          (memberchk(f-TF, T), float(TF), TF == 3.25)),
+    check('(e) string round-trips as string',
+          (memberchk(s-TS, T), string(TS), TS == "hello")),
+    check('(e) null round-trips as the atom null',
+          (memberchk(n-TN, T), TN == null)),
     check('(e) null is bound via WHERE n IS NULL',
           ( once(db_row(DB2, "SELECT i FROM typed WHERE n IS NULL", [], NR)),
-            get_dict(i, NR, NI), NI == 42 )),
+            memberchk(i-NI, NR), NI == 42 )),
 
     db_close(DB2).

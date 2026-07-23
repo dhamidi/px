@@ -41,36 +41,36 @@
 :- resources(widgets).
 
 about(Env0, Env) :-
-    Env1 = Env0.put(handled, about),
+    px_env:put_env(Env0, handled, about, Env1),
     px_env:respond(Env1, "about page", Env).
 
 index(Env0, Env) :-
-    Env1 = Env0.put(handled, index),
+    px_env:put_env(Env0, handled, index, Env1),
     px_env:respond(Env1, "widget index", Env).
 
 new(Env0, Env) :-
-    Env1 = Env0.put(handled, new),
+    px_env:put_env(Env0, handled, new, Env1),
     px_env:respond(Env1, "new widget form", Env).
 
 create(Env0, Env) :-
-    Env1 = Env0.put(handled, create),
+    px_env:put_env(Env0, handled, create, Env1),
     px_env:respond(Env1, "created", Env).
 
 show(Env0, Env) :-
-    Id = Env0.params.id,
-    Env1 = Env0.put(handled, show),
+    px_env:param(Env0, id, Id),
+    px_env:put_env(Env0, handled, show, Env1),
     px_env:respond(Env1, show_page(Id), Env).
 
 edit(Env0, Env) :-
-    Env1 = Env0.put(handled, edit),
+    px_env:put_env(Env0, handled, edit, Env1),
     px_env:respond(Env1, "edit widget form", Env).
 
 update(Env0, Env) :-
-    Env1 = Env0.put(handled, update),
+    px_env:put_env(Env0, handled, update, Env1),
     px_env:respond(Env1, "updated", Env).
 
 destroy(Env0, Env) :-
-    Env1 = Env0.put(handled, destroy),
+    px_env:put_env(Env0, handled, destroy, Env1),
     px_env:respond(Env1, "destroyed", Env).
 
 		 /*******************************
@@ -118,84 +118,84 @@ run_tests([T|Ts], Failed0, Failed) :-
     ),
     run_tests(Ts, Failed1, Failed).
 
-%   A fake env dict, the adr/0017 shape px_env:make_env/4 builds --
-%   built by hand here because this test exercises the router layer
-%   alone, with no transport and no HTTP parsing.
+%   A fake env, the adr/0017/0037 shape px_env:make_env/4 builds -- a
+%   plain Key-Value pairs list, built by hand here because this test
+%   exercises the router layer alone, with no transport and no HTTP
+%   parsing. Params is itself a pairs list.
 fake_env(Method, Path, Params,
-         env{ method:   Method,
-              path:     Path,
-              raw_path: Path,
-              headers:  [],
-              params:   Params,
-              body:     "",
-              worker:   1,
-              config:   px_config,
-              response: _{status: 200, headers: [], body: none}
-            }).
+         [ method-Method,
+           path-Path,
+           raw_path-Path,
+           headers-[],
+           params-Params,
+           body-"",
+           worker-1,
+           config-px_config,
+           response-response(200, [], none)
+         ]).
 
 		 /*******************************
 		 *           TESTS             *
 		 *******************************/
 
 test(dispatch_index) :-
-    fake_env(get, "/widgets", _{}, Env0),
+    fake_env(get, "/widgets", [], Env0),
     route_dispatch(Env0, Env),
-    Env.handled == index,
-    Env.response.status == 200,
-    Env.response.body == "widget index".
+    px_env:env_get(Env, handled, index),
+    px_env:env_get(Env, response, response(200, _, "widget index")).
 
 test(dispatch_show_merges_path_params) :-
     % Query param id=999 is present; the path param must win, and the
     % merged value is a string (adr/0017).
-    fake_env(get, "/widgets/7", _{id: "999", utm: "news"}, Env0),
+    fake_env(get, "/widgets/7", [id-"999", utm-"news"], Env0),
     route_dispatch(Env0, Env),
-    Env.handled == show,
-    Env.params.id == "7",                 % path param beat the query param
-    Env.params.utm == "news",             % other params ride along
-    Env.response.body == show_page("7").
+    px_env:env_get(Env, handled, show),
+    px_env:param(Env, id, "7"),           % path param beat the query param
+    px_env:param(Env, utm, "news"),       % other params ride along
+    px_env:env_get(Env, response, response(_, _, show_page("7"))).
 
 test(dispatch_custom_route) :-
-    fake_env(get, "/about", _{}, Env0),
+    fake_env(get, "/about", [], Env0),
     route_dispatch(Env0, Env),
-    Env.handled == about.
+    px_env:env_get(Env, handled, about).
 
 test(new_routes_before_show) :-
     % Rails ordering: /widgets/new is registered before /widgets/:id,
     % so it reaches new/2, not show/2 with id=new.
-    fake_env(get, "/widgets/new", _{}, Env0),
+    fake_env(get, "/widgets/new", [], Env0),
     route_dispatch(Env0, Env),
-    Env.handled == new,
-    \+ get_dict(id, Env.params, _).
+    px_env:env_get(Env, handled, new),
+    \+ px_env:param(Env, id, _).
 
 test(method_override_rewrites_post) :-
-    fake_env(post, "/widgets/7", _{'_method': "delete"}, Env0),
+    fake_env(post, "/widgets/7", ['_method'-"delete"], Env0),
     method_override(Env0, Env),
-    Env.method == delete,
-    Env.request.raw_method == post.
+    px_env:env_get(Env, method, delete),
+    px_env:env_get(Env, raw_method, post).
 
 test(method_override_dispatches_to_destroy) :-
     % The full two-element chain: override, then dispatch.
-    fake_env(post, "/widgets/7", _{'_method': "delete"}, Env0),
+    fake_env(post, "/widgets/7", ['_method'-"delete"], Env0),
     method_override(Env0, Env1),
     route_dispatch(Env1, Env),
-    Env.handled == destroy,
-    Env.params.id == "7".
+    px_env:env_get(Env, handled, destroy),
+    px_env:param(Env, id, "7").
 
 test(method_override_ignores_get) :-
     % _method on anything but POST is ignored.
-    fake_env(get, "/widgets/7", _{'_method': "delete"}, Env0),
+    fake_env(get, "/widgets/7", ['_method'-"delete"], Env0),
     method_override(Env0, Env),
-    Env.method == get,
-    \+ get_dict(request, Env, _).
+    px_env:env_get(Env, method, get),
+    \+ px_env:env_get(Env, raw_method, _).
 
 test(method_override_ignores_bogus_target) :-
     % A form cannot smuggle itself into being a GET or invent methods.
-    fake_env(post, "/widgets/7", _{'_method': "get"}, Env0),
+    fake_env(post, "/widgets/7", ['_method'-"get"], Env0),
     method_override(Env0, Env),
-    Env.method == post,
-    fake_env(post, "/widgets/7", _{'_method': "teapot"}, Env1),
+    px_env:env_get(Env, method, post),
+    fake_env(post, "/widgets/7", ['_method'-"teapot"], Env1),
     method_override(Env1, Env2),
-    Env2.method == post.
+    px_env:env_get(Env2, method, post).
 
 test(helper_predicates) :-
     % The four generated helpers, callable as ordinary predicates in
@@ -229,10 +229,10 @@ test(eval_attr_value_hook) :-
 
 test(redirect_accepts_helper_term) :-
     % redirect/3 goes through the eval_path_term hook (adr/0017).
-    fake_env(post, "/widgets", _{}, Env0),
+    fake_env(post, "/widgets", [], Env0),
     px_env:redirect(Env0, widget_path(5), Env),
-    Env.response.status == 303,
-    memberchk("location"-"/widgets/5", Env.response.headers).
+    px_env:env_get(Env, response, response(303, Headers, _)),
+    memberchk("location"-"/widgets/5", Headers).
 
 test(reverse_path_for_and_roundtrip) :-
     % v1 reverse routing still works on the generated routes...
@@ -252,11 +252,11 @@ test(reverse_path_for_and_roundtrip) :-
     P5 == "/widgets/42".
 
 test(no_match_declines) :-
-    fake_env(get, "/nope", _{}, EnvA),
+    fake_env(get, "/nope", [], EnvA),
     \+ route_dispatch(EnvA, _),
-    fake_env(patch, "/widgets", _{}, EnvB),       % wrong method for /widgets
+    fake_env(patch, "/widgets", [], EnvB),        % wrong method for /widgets
     \+ route_dispatch(EnvB, _),
-    fake_env(get, "/widgets/7/edit/x", _{}, EnvC),
+    fake_env(get, "/widgets/7/edit/x", [], EnvC),
     \+ route_dispatch(EnvC, _).
 
 %   Regression (the "Sign the guestbook" bug): link_to's PathTerm arg

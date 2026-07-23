@@ -12,10 +12,10 @@ IS the 404 (adr/0027 decision 2).
 :- page(index, "/",        [as(home)]).       % helper: home_path
 :- page(show,  "/adr/:id", [as(adr)]).        % helper: adr_path(Id)
 
-model(index, _Env, m{slugs: Slugs}) :-
+model(index, _Env, adr_index(Slugs)) :-
     adr_slugs(Slugs).
-model(show, Env, m{slug: Slug, markdown: Markdown}) :-
-    Slug = Env.params.id,
+model(show, Env, adr_page(Slug, Markdown)) :-
+    param(Env, id, Slug),                     % slug, not numeric: param/3
     adr_markdown(Slug, Markdown).
 
 view(index, M, home_view(M)).

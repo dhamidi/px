@@ -11,13 +11,14 @@ registry.
 :- page(index, "/ui").                        % route ui, helper ui_path
 :- page(show,  "/ui/:name").                  % route ui_show
 
-model(index, _Env, m{names: Names}) :-
+model(index, _Env, ui_index(Names)) :-
     findall(Order-Name, px_ui:demo(Name, Order, _), Pairs0),
     sort(Pairs0, Pairs),
     findall(N, member(_-N, Pairs), Names).
-model(show, Env, m{name: Name, call: Call}) :-
-    atom_string(Name, Env.params.name),
+model(show, Env, ui_show(Name, Call)) :-
+    param(Env, name, NameStr),
+    atom_string(Name, NameStr),
     px_ui:demo(Name, _, Call).
 
-view(index, M, ui_index_view(M.names)).
-view(show,  M, ui_show_view(M.name, M.call)).
+view(index, ui_index(Names), ui_index_view(Names)).
+view(show,  ui_show(Name, Call), ui_show_view(Name, Call)).

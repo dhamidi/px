@@ -20,12 +20,14 @@ px_template:tmpl/2:
 
     px_template:tmpl(Head, T) :- T = Body.
 
-The body is deliberately `T = Body` rather than a fact: SWI-Prolog's
-normal goal expansion of that unification, run in the *defining* module
-at load time, rewrites dict functional notation (`Post.title`) into
-render-time `.`/3 (get_dict) lookups.  So dict field access works
-anywhere in a template body with zero support code here, and a missing
-key errors at the offending template clause.
+The body is deliberately `T = Body` rather than a fact so the clause
+head can carry the template's argument pattern: a template
+destructures the plain term it is handed in its head
+(`comment_card(comment(Author, Body, When)) ~> ...`), so the body is
+pure data over plain variables. Template bodies are DATA, not code --
+they never call a goal (no `field/3`, no if-then-else); a row is
+projected into named parts by the model before it reaches a view
+(adr/0037).
 
 render/2 walks a body term and writes to Stream as it goes -- open tags
 are on the wire before their children are evaluated; there is no token
@@ -210,16 +212,7 @@ render(S, Term) :-
     compound(Term),
     !,
     compound_name_arity(Term, Name, Arity),
-    % NB: the dot-term case is matched structurally (never written as a
-    % literal '.'(_,_) term here, which SWI's own dict expansion would
-    % rewrite).  It is a safety net for dot-terms constructed at
-    % runtime; load-time template bodies are already rewritten by the
-    % system's dict expansion of `T = Body`.
-    (   Name == '.', Arity == 2, arg(1, Term, Dict), is_dict(Dict)
-    ->  arg(2, Term, Key),
-        get_dict(Key, Dict, Value),
-        render(S, Value)
-    ;   html_element(Name)
+    (   html_element(Name)
     ->  render_element(S, Name, Arity, Term)
     ;   tmpl(Term, Body)
     ->  render(S, Body)

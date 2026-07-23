@@ -15,8 +15,8 @@
 
    LIVE (temp db via px_db): create a table, insert/3 (rowid comes
    back), row/2 enumeration through use_db/1 with where/order/limit
-   (rows are dicts tagged with the table name), update/3 + verify,
-   delete/3 + verify, and the q_exec/2 escape hatch.
+   (rows are Key-Value pairs lists, read with field/3), update/3 +
+   verify, delete/3 + verify, and the q_exec/2 escape hatch.
 */
 
 :- use_module('../prolog/px_db.pl').
@@ -158,15 +158,17 @@ live_checks(Path) :-
     q_exec("CREATE TABLE posts (id INTEGER PRIMARY KEY, title TEXT, author TEXT, score INTEGER)",
            []),
 
-    % insert/3: columns from dict keys, Id from last_insert_rowid.
-    insert(posts, _{title: "first",  author: "d", score: 1}, Id1),
+    % insert/3: columns from the pairs list's keys, Id from
+    % last_insert_rowid.
+    insert(posts, [title-"first",  author-"d", score-1], Id1),
     check('(L1) first insert returns rowid 1', Id1 == 1),
-    insert(posts, _{title: "second", author: "d", score: 5}, Id2),
-    insert(posts, _{title: "third",  author: "e", score: 9}, Id3),
+    insert(posts, [title-"second", author-"d", score-5], Id2),
+    insert(posts, [title-"third",  author-"e", score-9], Id3),
     check('(L1) rowids increment', (Id2 == 2, Id3 == 3)),
 
     % row/2 enumeration on the use_db/1 connection, with
-    % where/order/limit -- rows are dicts tagged with the table name.
+    % where/order/limit -- rows are Key-Value pairs lists, read with
+    % field/3.
     findall(R, row(q(posts, [ where(author == "d"),
                               order_by(desc(score)),
                               limit(2) ]), R),
@@ -174,43 +176,49 @@ live_checks(Path) :-
     format("rows: ~q~n", [Rows]),
     check('(L2) row/2 streams 2 matching rows', (length(Rows, 2))),
     Rows = [RA, RB],
-    check('(L2) rows are dicts tagged posts', (is_dict(RA, posts), is_dict(RB, posts))),
-    check('(L2) ordered desc by score', (RA.score == 5, RB.score == 1)),
+    check('(L2) rows are Key-Value pairs lists', (is_list(RA), is_list(RB))),
+    check('(L2) ordered desc by score', (field(RA, score, 5), field(RB, score, 1))),
     check('(L2) once/1 takes the first row only',
           ( once(row(q(posts, [order_by(title)]), First)),
-            get_dict(title, First, FT), FT == "first" )),
+            field(First, title, FT), FT == "first" )),
 
     % row/3 explicit-connection variant.
     check('(L3) row/3 explicit-DB variant agrees',
           ( findall(T3, ( row(DB, q(posts, [select(title), order_by(title)]), TR3),
-                          get_dict(title, TR3, T3) ),
+                          field(TR3, title, T3) ),
                     Titles),
             Titles == ["first", "second", "third"] )),
 
     % update/3 + verify.
-    update(posts, _{score: 100}, author == "d"),
+    update(posts, [score-100], author == "d"),
     findall(S, ( row(q(posts, [where(author == "d")]), UR),
-                 get_dict(score, UR, S) ),
+                 field(UR, score, S) ),
             Scores),
     check('(L4) update/3 changed both matching rows', Scores == [100, 100]),
     check('(L4) update left the other author alone',
           ( once(row(q(posts, [where(author == "e")]), ER)),
-            get_dict(score, ER, 9) )),
+            field(ER, score, 9) )),
 
     % delete/3 (module delete/2 with current db) + verify.
     delete(posts, score == 100),
-    findall(I, ( row(q(posts, []), DR), get_dict(id, DR, I) ),
+    findall(I, ( row(q(posts, []), DR), field(DR, id, I) ),
             RemainingIds),
     check('(L5) delete/2 removed the updated rows', RemainingIds == [3]),
 
     % explicit-DB write variants + q_exec escape hatch.
-    insert(DB, posts, _{title: "fourth", author: "f", score: 2}, Id4),
+    insert(DB, posts, [title-"fourth", author-"f", score-2], Id4),
     check('(L6) insert/4 explicit-DB works', Id4 == 4),
     delete(DB, posts, id == Id4),
     q_exec(DB, "INSERT INTO posts (title, author, score) VALUES (?, ?, ?)",
            ["fifth", "g", 7]),
     check('(L6) q_exec/3 escape hatch inserts (params still ?-bound)',
           ( once(row(q(posts, [where(author == "g")]), QR)),
-            get_dict(title, QR, "fifth") )),
+            field(QR, title, "fifth") )),
+
+    % field/3 throws loudly on a typo'd column.
+    check('(L7) field/3 throws existence_error on unknown column',
+          catch(( field(QR, nope, _), fail ),
+                error(existence_error(column, nope), _),
+                true)),
 
     db_close(DB).

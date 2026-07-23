@@ -51,8 +51,8 @@ db_close(DB) :-
 %   fails the enumeration -- the natural Prolog way to say "no more
 %   rows". Whatever way execution leaves -- exhaustion, a cut, once/1,
 %   or an exception -- setup_call_cleanup/3 finalizes the statement.
-%   Row is a dict tagged `row`, keyed by column-name atoms:
-%   row{id: 7, title: "..."}.
+%   Row is a Key-Value pairs list keyed by column-name atoms:
+%   [id-7, title-"..."] (adr/0037 decision 4).
 %
 %   Binding happens inside the Call argument (not the Setup, as
 %   adr/0020's sketch has it) so that a bind error -- e.g. a type error
@@ -75,7 +75,7 @@ bind_all([P|Ps], I, Stmt) :-
 
 % The repeat/step loop is the classic Prolog idiom for driving an
 % external cursor; column names are fetched once, before the first
-% step, and reused for every row dict.
+% step, and reused for every row's pairs list.
 stmt_row(Stmt, Row) :-
     sqlite3_column_count(Stmt, N),
     column_names(Stmt, 0, N, Names),
@@ -83,8 +83,7 @@ stmt_row(Stmt, Row) :-
     sqlite3_step(Stmt, Result),
     (   Result == row
     ->  columns(Stmt, 0, N, Values),
-        pairs_keys_values(Pairs, Names, Values),
-        dict_pairs(Row, row, Pairs)
+        pairs_keys_values(Row, Names, Values)
     ;   !, fail                        % done: cut the repeat, end enumeration
     ).
 

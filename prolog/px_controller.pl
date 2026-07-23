@@ -57,7 +57,8 @@ defined no layout/2 template.
 %   Sibling imports per adr/0030: the spec is the location.
 :- use_module(px_template).
 :- use_module(px_env, [respond/3, respond/4, redirect/3, redirect/4,
-                       not_found/2]).
+                       not_found/2, param/3, params/2,
+                       env_get/3, put_env/4]).
 :- use_module(px_form, [form_result/3]).
 :- use_module(px_turbo, [turbo_or_redirect/4, turbo_stream/3]).
 :- use_module(px_assets, []).
@@ -268,7 +269,7 @@ decode_msg(M, Env, Msg) :-
     (   feature_form(M, Name)
     ->  form_result(Name, Env, Result),
         Msg =.. [Name, Result]
-    ;   get_dict(params, Env, Params),
+    ;   params(Env, Params),
         Msg =.. [Name, Params]
     ).
 
@@ -276,8 +277,7 @@ decode_msg(M, Env, Msg) :-
 %   declared form (controller + messages module together) needs no
 %   `_msg` at all.
 msg_name(M, Env, Name) :-
-    get_dict(params, Env, Params),
-    (   get_dict('_msg', Params, V)
+    (   param(Env, '_msg', V)
     ->  to_atom(V, Name)
     ;   findall(N, feature_form(M, N), [Name])
     ).
@@ -323,14 +323,13 @@ run_effects(Effects, M, Action, Model, Env0, Env) :-
     ).
 
 %   Fold header effects into an already-built response (the turbo
-%   paths construct their own response dicts).
+%   paths construct their own response compounds).
 add_headers(Env, [], Env) :- !.
 add_headers(Env0, HeaderOpts, Env) :-
     findall(N-V, member(header(N, V), HeaderOpts), Extra),
-    get_dict(response, Env0, R0),
-    get_dict(headers, R0, Hs0),
+    env_get(Env0, response, response(S, Hs0, B)),
     append(Hs0, Extra, Hs),
-    Env = Env0.put(response/headers, Hs).
+    put_env(Env0, response, response(S, Hs, B), Env).
 
 check_effect(redirect(_)) :- !.
 check_effect(turbo(Streams)) :- !, must_be(list, Streams).

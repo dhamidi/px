@@ -112,7 +112,7 @@ on_message_complete(Key, Parser, Client, RequestGoal) :-
     nb_delete(Key),
     reverse(HeadersRev, Headers),
     llhttp_method_name(Parser, Method),
-    Request = _{method: Method, url: Url, headers: Headers, body: Body},
+    Request = http_request(Method, Url, Headers, Body),
     uv_response_stream(Client, ResponseStream),
     call(RequestGoal, Request, ResponseStream),
     uv_close(Client, http_stream:ignore_close_result).

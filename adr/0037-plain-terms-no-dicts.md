@@ -1,6 +1,6 @@
 # 0037. Plain terms everywhere: excise SWI dicts
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 

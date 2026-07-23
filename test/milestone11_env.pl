@@ -1,9 +1,9 @@
 /* Milestone 11: the Rack-style env layer (px_env.pl, adr/0017) and
    the config subsystem (px_config.pl + config/app.pl, adr/0022),
-   standalone -- no sockets. A fake v1 request dict (the exact shape
-   http_stream.pl builds: _{method, url, headers, body}) goes through
-   px_env:handle_request/3 against an in-memory output stream, and the
-   written bytes are asserted on.
+   standalone -- no sockets. A fake v1 request compound (the exact
+   shape http_stream.pl builds: http_request(Method, Url, Headers,
+   Body), adr/0037) goes through px_env:handle_request/3 against an
+   in-memory output stream, and the written bytes are asserted on.
 
    Covers:
      - config: base facts, env('PORT', Default) resolution with typing
@@ -121,12 +121,20 @@ test(config_env_var_typing) :-
     Port == 8091.                          % a number, not '8091' text
 
 test(config_production_overlay) :-
+    %   The production overlay for `database` is env-driven
+    %   (env('DATABASE_PATH', "data/prologex.db")): a real deploy sets
+    %   DATABASE_PATH, this sandbox keeps the writable local default
+    %   (adr/0022, config/app.pl).  Set it here to prove the overlay
+    %   is active under production and resolves the env value.
     setenv('PROLOGEX_ENV', production),
+    setenv('DATABASE_PATH', '/srv/app/prod.db'),
     px_config:current_env(production),
     px_config:config(database, DB),
     px_config:config(port, Port),          % no production overlay: base
+    clear_env('DATABASE_PATH'),
     clear_env('PROLOGEX_ENV'),
-    DB == "/var/lib/prologex/prologex.db",
+    atom_string(DB, "/srv/app/prod.db"),   % production overlay + env resolution
+                                           % (a set env var resolves to an atom)
     Port == 8090,
     px_config:config(database, DevDB),     % back in development
     DevDB == "data/prologex.db".
@@ -160,7 +168,7 @@ test(require_config_missing) :-
 		 *******************************/
 
 fake_request(Method, Url, Headers, Body,
-             _{method: Method, url: Url, headers: Headers, body: Body}).
+             http_request(Method, Url, Headers, Body)).
 
 capture(Request, WorkerId, Out) :-
     with_output_to(string(Out),
@@ -186,18 +194,16 @@ test(env_shape) :-
                  ["Host"-"example.org", "Accept"-"text/html"],
                  "", Request),
     px_env:make_env(Request, user_output, 2, Env),
-    is_dict(Env, env),
-    Env.method == get,
-    Env.path == "/posts/7",
-    Env.raw_path == "/posts/7?utm=news",
-    Env.headers == ["host"-"example.org", "accept"-"text/html"],
-    Env.params.utm == "news",
-    Env.body == "",
-    Env.worker == 2,
-    Env.config == px_config,               % accessor marker, no snapshot
-    Env.response.status == 200,
-    Env.response.headers == [],
-    Env.response.body == none.
+    is_list(Env),
+    env_get(Env, method, get),
+    env_get(Env, path, "/posts/7"),
+    env_get(Env, raw_path, "/posts/7?utm=news"),
+    env_get(Env, headers, ["host"-"example.org", "accept"-"text/html"]),
+    param(Env, utm, "news"),
+    env_get(Env, body, ""),
+    env_get(Env, worker, 2),
+    env_get(Env, config, px_config),       % accessor marker, no snapshot
+    env_get(Env, response, response(200, [], none)).
 
 test(env_params_merging) :-
     % Query params win over form params; form body parsed only when
@@ -207,23 +213,23 @@ test(env_params_merging) :-
                   "Content-Type"-"application/x-www-form-urlencoded"],
                  "b=formb&c=three", Request),
     px_env:make_env(Request, user_output, 1, Env),
-    Env.params.a == "1",
-    Env.params.b == "two",                 % query beats form
-    Env.params.c == "three",               % form-only key present
+    param(Env, a, "1"),
+    param(Env, b, "two"),                  % query beats form
+    param(Env, c, "three"),                % form-only key present
     % Same body, but not form-encoded: body must NOT be parsed.
     fake_request('POST', "/params", ["Content-Type"-"text/plain"],
                  "b=formb&c=three", Request2),
     px_env:make_env(Request2, user_output, 1, Env2),
-    \+ get_dict(c, Env2.params, _),
-    Env2.body == "b=formb&c=three".
+    \+ param(Env2, c, _),
+    env_get(Env2, body, "b=formb&c=three").
 
 test(env_merge_params_path_wins) :-
     fake_request('GET', "/posts/7?id=999&utm=news", [], "", Request),
     px_env:make_env(Request, user_output, 1, Env0),
-    Env0.params.id == "999",
-    px_env:env_merge_params(Env0, _{id: "7"}, Env),  % the router's call
-    Env.params.id == "7",                  % path param wins
-    Env.params.utm == "news".              % others ride along
+    param(Env0, id, "999"),
+    px_env:env_merge_params(Env0, [id-"7"], Env),  % the router's call
+    param(Env, id, "7"),                   % path param wins
+    param(Env, utm, "news").               % others ride along
 
 
 		 /*******************************
@@ -236,13 +242,13 @@ test(env_merge_params_path_wins) :-
 %   router uses only the public helpers.
 
 logger(Env0, Env) :-
-    Env = Env0.put(logged, true).
+    put_env(Env0, logged, true, Env).
 
 always_declines(_Env0, _Env) :-
     fail.
 
 fake_router(Env0, Env) :-
-    Path = Env0.path,
+    env_get(Env0, path, Path),
     (   Path == "/hi"
     ->  px_env:respond(Env0, "hello world", Env)
     ;   Path == "/go"
@@ -265,8 +271,8 @@ test(pipeline_hit) :-
     % Relational check: middleware-added key survives the whole fold.
     px_env:make_env(Request, user_output, 3, Env0),
     px_env:dispatch_env(Env0, Env),
-    Env.logged == true,
-    Env.response.status == 200,
+    env_get(Env, logged, true),
+    env_get(Env, response, response(200, _, _)),
     % Wire check.
     capture(Request, 3, Out),
     contains(Out, "HTTP/1.1 200 OK\r\n"),

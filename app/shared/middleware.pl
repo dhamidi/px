@@ -18,4 +18,6 @@ the request (adr/0017 fold semantics).
 %   Request logging to stderr (journald under systemd): method and
 %   path on the way in, before dispatch.
 log_requests(Env, Env) :-
-    format(user_error, "~w ~w~n", [Env.method, Env.path]).
+    env_get(Env, method, Method),
+    env_get(Env, path, Path),
+    format(user_error, "~w ~w~n", [Method, Path]).

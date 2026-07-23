@@ -102,10 +102,11 @@ public_asset_file(Hashed, Path) :-
     atomic_list_concat([Dir, '/../public/assets/', Hashed], Path).
 
 fake_env(Headers, Params,
-         env{ method: get, path: "/assets/x", raw_path: "/assets/x",
-              headers: Headers, params: Params, body: "",
-              worker: 1, config: px_config,
-              response: _{status: 200, headers: [], body: none} }).
+         [ method-get, path-"/assets/x", raw_path-"/assets/x",
+           headers-Headers, params-Params, body-"",
+           worker-1, config-px_config,
+           response-response(200, [], none)
+         ]).
 
            /*******************************
            *           TESTS              *
@@ -210,20 +211,22 @@ restore_and_recompile(SrcPath, Original) :-
 %   actually in the manifest is a 404, never a filesystem lookup.
 test(serve_asset_whitelist_only) :-
     compile_assets,
-    fake_env([], _{file: "not-a-real-asset-000000000000.css"}, Env0),
+    fake_env([], [file-"not-a-real-asset-000000000000.css"], Env0),
     serve_asset(Env0, Env),
-    expect(Env.response.status == 404).
+    px_env:env_get(Env, response, response(Status, _, _)),
+    expect(Status == 404).
 
 test(serve_asset_plain_headers) :-
     compile_assets,
     px_assets:manifest_entry("css/app.css", Hashed),
-    fake_env([], _{file: Hashed}, Env0),
+    fake_env([], [file-Hashed], Env0),
     serve_asset(Env0, Env),
-    expect(Env.response.status == 200),
-    expect(memberchk("content-type"-"text/css; charset=utf-8", Env.response.headers)),
+    px_env:env_get(Env, response, response(Status, RespHeaders, Body)),
+    expect(Status == 200),
+    expect(memberchk("content-type"-"text/css; charset=utf-8", RespHeaders)),
     expect(memberchk("cache-control"-"public, max-age=31536000, immutable",
-                     Env.response.headers)),
-    expect(Env.response.body = raw_bytes(_)).
+                     RespHeaders)),
+    expect(Body = raw_bytes(_)).
 
 %   Accept-Encoding: gzip against a file with a .gz sibling serves
 %   THOSE bytes (content-encoding: gzip, vary: accept-encoding), and
@@ -232,12 +235,13 @@ test(serve_asset_plain_headers) :-
 test(serve_asset_gzip_negotiation_roundtrips) :-
     compile_assets,
     px_assets:manifest_entry("css/app.css", Hashed),
-    fake_env(["accept-encoding"-"gzip, deflate, br"], _{file: Hashed}, Env0),
+    fake_env(["accept-encoding"-"gzip, deflate, br"], [file-Hashed], Env0),
     serve_asset(Env0, Env),
-    expect(Env.response.status == 200),
-    expect(memberchk("content-encoding"-"gzip", Env.response.headers)),
-    expect(memberchk("vary"-"accept-encoding", Env.response.headers)),
-    Env.response.body = raw_bytes(GzBytes),
+    px_env:env_get(Env, response, response(Status, RespHeaders, Body)),
+    expect(Status == 200),
+    expect(memberchk("content-encoding"-"gzip", RespHeaders)),
+    expect(memberchk("vary"-"accept-encoding", RespHeaders)),
+    Body = raw_bytes(GzBytes),
     setup_call_cleanup(
         open('/tmp/milestone16_gzip_roundtrip.gz', write, Out, [encoding(octet)]),
         write(Out, GzBytes),

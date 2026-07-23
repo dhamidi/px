@@ -1,6 +1,7 @@
 :- module(px_form,
-          [ form_validate/3,        % +FormName, +ParamsDict, -Result
-            form_result/3           % +FormName, +Env, -Result
+          [ form_validate/3,        % +FormName, +ParamsPairs, -Result
+            form_result/3,          % +FormName, +Env, -Result
+            field_value/3           % +Values, +Field, -Value  (semidet)
           ]).
 
 :- use_module(library(lists)).
@@ -8,6 +9,13 @@
 :- use_module(library(error)).
 :- use_module(library(pcre)).
 :- use_module(px_template).
+%   Only form_result/3 needs px_env, for the params/2 accessor (its
+%   env argument's params pairs list); form_for/field_input resolve
+%   action path terms purely through the local eval_path_term/2 hook
+%   below, so THEY keep working even in a harness that never loads
+%   px_env (a test registering stand-in hook clauses, exactly like the
+%   router would).
+:- use_module(px_env, [params/2]).
 
 /** <module> Forms (adr/0023): declared once, validated purely,
     re-rendered from the same declaration.
@@ -34,12 +42,17 @@ Constraints (closed vocabulary): required, max_length(N),
 min_length(N), numeric, range(Lo, Hi), format(Regex), in(List),
 check(Pred), check(Pred, Message).
 
-Validation is the pure form_validate/3 over a params dict (atom keys,
-string values, adr/0017); form_result/3 merely reads Env.params.
-Result is one of
+Validation is the pure form_validate/3 over a params Key-Value pairs
+list (atom keys, string values, adr/0017); form_result/3 merely reads
+the env's params via px_env:params/2. Result is one of
 
     ok(Values)              typed casts, declared fields only
     invalid(Values, Errors) raw input preserved, error(Field, Msg) list
+
+Values is itself a Key-Value pairs list (adr/0037); field_value/3
+reads one field out of it, defaulting to "" when the field is absent
+or blank -- the accessor app and template code use instead of
+reaching into the list directly.
 
 Evaluation rules (adr/0023 section 1): constraints run in declaration
 order and the FIRST failing constraint yields the field's single
@@ -156,28 +169,27 @@ constraint_decl(check(P, Msg)) :- atom(P), ( string(Msg) ; atom(Msg) ), !.
 
 %!  form_result(+FormName, +Env, -Result) is det.
 %
-%   form_validate/3 over Env.params (adr/0017).  Reads the env, does
-%   not thread or modify it.
+%   form_validate/3 over the env's params pairs list (adr/0017,
+%   px_env:params/2).  Reads the env, does not thread or modify it.
 
 form_result(FormName, Env, Result) :-
-    get_dict(params, Env, Params),
+    params(Env, Params),
     form_validate(FormName, Params, Result).
 
-%!  form_validate(+FormName, +ParamsDict, -Result) is det.
+%!  form_validate(+FormName, +ParamsPairs, -Result) is det.
 %
-%   The pure core: params dict in, `ok(Values)` (typed, declared
-%   fields only) or `invalid(Values, Errors)` (raw input preserved,
-%   errors in field declaration order) out.
+%   The pure core: a params Key-Value pairs list in, `ok(Values)`
+%   (typed, declared fields only) or `invalid(Values, Errors)` (raw
+%   input preserved, errors in field declaration order) out -- Values
+%   itself a Key-Value pairs list (adr/0037).
 
 form_validate(FormName, Params, Result) :-
-    must_be(dict, Params),
+    must_be(list, Params),
     form_lookup(FormName, Module, Fields),
     validate_fields(Fields, Module, Params, RawPairs, TypedPairs, Errors),
     (   Errors == []
-    ->  dict_pairs(Values, _, TypedPairs),
-        Result = ok(Values)
-    ;   dict_pairs(Values, _, RawPairs),
-        Result = invalid(Values, Errors)
+    ->  Result = ok(TypedPairs)
+    ;   Result = invalid(RawPairs, Errors)
     ).
 
 form_lookup(Name, Module, Fields) :-
@@ -210,13 +222,13 @@ validate_fields([field(F, Widget, Cs)|Fields], Module, Params,
 
 field_raw(checkbox, F, Params, Raw) :-
     !,
-    (   get_dict(F, Params, V),
+    (   memberchk(F-V, Params),
         \+ checkbox_off(V)
     ->  Raw = true
     ;   Raw = false
     ).
 field_raw(_, F, Params, Raw) :-
-    (   get_dict(F, Params, V)
+    (   memberchk(F-V, Params)
     ->  to_string(V, Raw)
     ;   Raw = ""
     ).
@@ -419,7 +431,7 @@ render_field_input(FormName, FieldName, Values, Errors, S) :-
                             'field not declared in this form')))
     ),
     field_dom_id(FormName, FieldName, Id),
-    field_value(Widget, FieldName, Values, V),
+    widget_refill_value(Widget, FieldName, Values, V),
     widget_input(Widget, Module, FieldName, Id, V, Input),
     field_error_els(FieldName, Errors, ErrEls, _Class),
     px_template:render(S, [Input|ErrEls]).
@@ -430,7 +442,7 @@ render_field_input(FormName, FieldName, Values, Errors, S) :-
 
 field_element(FormName, Module, field(F, Widget, _Cs), Values, Errors, El) :-
     field_dom_id(FormName, F, Id),
-    field_value(Widget, F, Values, V),
+    widget_refill_value(Widget, F, Values, V),
     widget_input(Widget, Module, F, Id, V, Input),
     (   Widget == hidden
     ->  El = Input
@@ -444,23 +456,35 @@ field_error_els(F, Errors, [p(class(error), Msg)], "field field-error") :-
     !.
 field_error_els(_, _, [], "field").
 
-%   The current value for refilling, from the Values dict the handler
-%   passed (raw on 422, typed after ok, empty dict on GET-new).
+%!  field_value(+Values, +Field, -Value) is semidet.
+%
+%   The accessor over a form's Values pairs list (adr/0037): the
+%   field's value, or "" when Field is absent or its value is blank.
+%   Both app code (reading an ok(Values) result) and the rendering
+%   helpers below (refilling from raw or typed Values) go through
+%   this -- Values is never destructured directly.
 
-field_value(checkbox, F, Values, V) :-
+field_value(Values, Field, Value) :-
+    (   memberchk(Field-V, Values)
+    ->  Value = V
+    ;   Value = ""
+    ).
+
+%   The current widget-appropriate value for refilling, from the
+%   Values pairs list the handler passed (raw on 422, typed after ok,
+%   [] on GET-new).  Checkboxes render as true/false regardless of
+%   what rode in (a raw "on"/absent string, or an already-typed
+%   boolean); every other widget takes the value as-is.
+
+widget_refill_value(checkbox, F, Values, V) :-
     !,
-    (   is_dict(Values),
-        get_dict(F, Values, V0),
+    (   field_value(Values, F, V0),
         \+ checkbox_off(V0)
     ->  V = true
     ;   V = false
     ).
-field_value(_, F, Values, V) :-
-    (   is_dict(Values),
-        get_dict(F, Values, V0)
-    ->  V = V0
-    ;   V = ""
-    ).
+widget_refill_value(_, F, Values, V) :-
+    field_value(Values, F, V).
 
 %!  widget_input(+Widget, +Module, +FieldName, +Id, +Value, -Element)
 %

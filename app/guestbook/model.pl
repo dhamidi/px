@@ -9,13 +9,12 @@ fold over the model. No prologex import, no database, no env --
 this module must stay loadable and testable with nothing but SWI.
 */
 
-empty(m{comments: [], values: _{}, errors: []}).
+%   The model is a plain tagged compound guestbook(Comments, Values,
+%   Errors): Comments the projected comment/3 terms, Values the form's
+%   pairs list (empty on a clean form), Errors the error/2 list.
+empty(guestbook([], [], [])).
 
-loaded(Comments, M0, M) :-
-    M = M0.put(comments, Comments).
+loaded(Comments, guestbook(_, V, E), guestbook(Comments, V, E)).
 
-update(signed(Comment), M0, M) :-
-    M = M0.put(_{comments: [Comment|M0.comments],
-                 values: _{}, errors: []}).
-update(rejected(Values, Errors), M0, M) :-
-    M = M0.put(_{values: Values, errors: Errors}).
+update(signed(Comment), guestbook(Cs, _, _), guestbook([Comment|Cs], [], [])).
+update(rejected(Values, Errors), guestbook(Cs, _, _), guestbook(Cs, Values, Errors)).
